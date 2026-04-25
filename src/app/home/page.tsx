@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts'
 import { useAppStore } from '@/stores/use-app-store'
@@ -109,6 +109,7 @@ export default function HomePage() {
   const [localhostBrowser, setLocalhostBrowser] = useState(false)
   const [pageReady, setPageReady] = useState(false)
   const [launchpadFlag, setLaunchpadFlag] = useState(false)
+  const launchpadFlagConsumedRef = useRef(false)
   const mountedRef = useMountedRef()
 
   useEffect(() => {
@@ -116,9 +117,12 @@ export default function HomePage() {
   }, [])
 
   useEffect(() => {
+    if (launchpadFlagConsumedRef.current) return
     const hasFlag = safeStorageGet(HOME_LAUNCHPAD_AFTER_SETUP_KEY) === '1'
-    setLaunchpadFlag(hasFlag)
-    if (hasFlag) safeStorageRemove(HOME_LAUNCHPAD_AFTER_SETUP_KEY)
+    if (!hasFlag) return
+    launchpadFlagConsumedRef.current = true
+    setLaunchpadFlag(true)
+    safeStorageRemove(HOME_LAUNCHPAD_AFTER_SETUP_KEY)
   }, [])
 
   const allAgents = Object.values(agents).filter((a) => !a.trashedAt)
@@ -279,6 +283,10 @@ export default function HomePage() {
             onOpenBuilder={openBuilder}
             onOpenConnectors={() => navigateTo('connectors')}
             onOpenUsage={() => navigateTo('usage')}
+            onRunEvalSuite={() => navigateTo('quality')}
+            onReviewApprovals={() => navigateTo('quality')}
+            onInspectFailedRuns={() => navigateTo('quality')}
+            onStartReleaseQaMission={() => navigateTo('missions')}
           />
         </div>
       </MainContent>

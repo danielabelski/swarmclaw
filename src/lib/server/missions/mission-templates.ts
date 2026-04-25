@@ -188,6 +188,122 @@ export const BUILT_IN_MISSION_TEMPLATES: MissionTemplate[] = [
     },
   },
   {
+    id: 'release-candidate-qa',
+    name: 'Release Candidate QA',
+    description:
+      'Collect release readiness evidence across evals, approvals, failed runs, docs, packaging, and desktop smoke gates.',
+    icon: '✅',
+    category: 'productivity',
+    tags: ['release', 'qa', 'evals', 'operator-quality'],
+    setupNote:
+      'Set the target version and release branch in the goal. Keep publishing, tagging, and merging behind explicit human approval.',
+    defaults: {
+      title: 'Release Candidate QA',
+      goal:
+        'Prepare a release candidate quality report for the target SwarmClaw version. Review recent failed runs, pending approvals, latest eval results, release notes, package metadata, install instructions, CI/build status, and desktop packaging notes. Summarize blockers, risk level, evidence links, and a go/no-go recommendation. Do not merge, tag, publish, deploy, or post publicly without explicit approval.',
+      successCriteria: [
+        'Failed runs and pending approvals are reviewed with evidence or clear no-findings notes',
+        'Eval coverage, score trends, and any failed criteria are summarized',
+        'Release notes, package metadata, install pins, and desktop smoke requirements are checked',
+        'Final report includes blockers, risks, follow-up tasks, and a go/no-go recommendation',
+      ],
+      budget: budget({ maxUsd: 2, maxTokens: 120_000, maxTurns: 160, maxWallclockSec: DAY }),
+      reportSchedule: report(6 * HOUR),
+    },
+  },
+  {
+    id: 'agent-cost-audit',
+    name: 'Agent Cost Audit',
+    description:
+      'Inspect agent/provider spend, token usage, and high-cost runs, then recommend budget or routing adjustments.',
+    icon: '💸',
+    category: 'monitoring',
+    tags: ['cost', 'usage', 'budget', 'quality'],
+    setupNote:
+      'Add any budget targets, providers, or agents that need special attention before starting.',
+    defaults: {
+      title: 'Agent Cost Audit',
+      goal:
+        'Audit recent SwarmClaw agent costs and token usage. Identify top-spend agents, expensive runs, provider anomalies, retry loops, and avoidable tool calls. Produce a markdown report with recommended budget caps, model routing changes, and follow-up quality checks. Do not change budgets or provider settings without approval.',
+      successCriteria: [
+        'Top cost drivers are listed with agent, provider, source, and supporting evidence',
+        'At least 3 concrete cost-control recommendations are included',
+        'Any suspected runaway, retry, or noisy automation pattern is flagged',
+      ],
+      budget: budget({ maxUsd: 1.5, maxTokens: 80_000, maxTurns: 100, maxWallclockSec: DAY }),
+      reportSchedule: report(DAY),
+    },
+  },
+  {
+    id: 'connector-smoke-test',
+    name: 'Connector Smoke Test',
+    description:
+      'Verify configured connector health, delivery paths, approval boundaries, and recent connector-linked run evidence.',
+    icon: '🔌',
+    category: 'monitoring',
+    tags: ['connectors', 'smoke-test', 'approval', 'quality'],
+    setupNote:
+      'Name the connectors and channels to test. Keep outbound messages or public replies approval-gated.',
+    defaults: {
+      title: 'Connector Smoke Test',
+      goal:
+        'Smoke test configured SwarmClaw connectors. Check connector status, recent inbound/outbound activity, approval requirements, related failed runs, and any available logs. Draft a concise pass/fail report per connector with evidence and remediation steps. Do not send public replies or change connector settings without approval.',
+      successCriteria: [
+        'Each targeted connector receives a pass, warn, or fail status',
+        'Recent connector-linked failures or delivery issues are summarized with evidence',
+        'Approval boundaries for outbound replies or sender permissions are explicitly checked',
+      ],
+      budget: budget({ maxUsd: 1.25, maxTokens: 70_000, maxTurns: 90, maxWallclockSec: 12 * HOUR }),
+      reportSchedule: report(6 * HOUR),
+    },
+  },
+  {
+    id: 'failed-run-triage',
+    name: 'Failed Run Triage',
+    description:
+      'Review recent failed runs, cluster root causes, and propose fixes with replay evidence.',
+    icon: '🧯',
+    category: 'support',
+    tags: ['runs', 'triage', 'debugging', 'quality'],
+    setupNote:
+      'Optionally narrow the mission to a source, agent, task, or release window.',
+    defaults: {
+      title: 'Failed Run Triage',
+      goal:
+        'Triage recent failed SwarmClaw runs. Inspect run records, replay events, errors, retrieval evidence, source, owner, and timing. Cluster failures by likely root cause and write a prioritized remediation report with reproduction notes where possible. Do not modify code or settings unless explicitly asked.',
+      successCriteria: [
+        'Recent failed runs are grouped by likely root cause',
+        'Each high-priority failure includes evidence from the run record or replay',
+        'Remediation recommendations are prioritized by user impact and confidence',
+      ],
+      budget: budget({ maxUsd: 1.5, maxTokens: 90_000, maxTurns: 120, maxWallclockSec: DAY }),
+      reportSchedule: report(6 * HOUR),
+    },
+  },
+  {
+    id: 'weekly-agent-quality-report',
+    name: 'Weekly Agent Quality Report',
+    description:
+      'Produce a weekly operator report across eval trends, approvals, failed runs, missions, cost, and release risk.',
+    icon: '📈',
+    category: 'monitoring',
+    tags: ['weekly', 'quality', 'report', 'evals'],
+    setupNote:
+      'Set the week or workspace scope in the goal if you want a narrower report.',
+    defaults: {
+      title: 'Weekly Agent Quality Report',
+      goal:
+        'Produce a weekly SwarmClaw agent quality report. Summarize eval trends, failed and recovered runs, pending or high-risk approvals, mission outcomes, cost changes, connector health, and release-readiness risks. Include a short executive summary and a prioritized action list for the next week.',
+      successCriteria: [
+        'Report includes eval, run, approval, mission, connector, and cost sections',
+        'Top quality risks and regressions are clearly ranked',
+        'Next-week action items are specific and tied to evidence',
+      ],
+      budget: budget({ maxUsd: 3, maxTokens: 180_000, maxTurns: 180, maxWallclockSec: 7 * DAY }),
+      reportSchedule: report(DAY),
+    },
+  },
+  {
     id: 'hello-world-demo',
     name: 'Hello World Demo',
     description:

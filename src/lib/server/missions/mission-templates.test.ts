@@ -74,6 +74,28 @@ describe('mission-templates: registry', () => {
     assert.ok(template.defaults.successCriteria.some((item) => item.includes('Product Hunt')))
   })
 
+  it('includes operator quality release templates', () => {
+    const expected = [
+      'release-candidate-qa',
+      'agent-cost-audit',
+      'connector-smoke-test',
+      'failed-run-triage',
+      'weekly-agent-quality-report',
+    ]
+
+    for (const id of expected) {
+      const template = templates.getMissionTemplate(id)
+      assert.ok(template, `expected ${id} template`)
+      assert.ok(template.tags.includes('quality') || template.tags.includes('operator-quality'), `${id} should be quality tagged`)
+      assert.ok(template.defaults.goal.includes('approval') || template.defaults.goal.includes('evidence'), `${id} should preserve operator guardrails`)
+      assert.ok(template.defaults.budget.maxWallclockSec, `${id} should have a wallclock cap`)
+      assert.ok(template.defaults.reportSchedule, `${id} should schedule reports`)
+    }
+
+    assert.equal(templates.getMissionTemplate('release-candidate-qa')?.name, 'Release Candidate QA')
+    assert.equal(templates.getMissionTemplate('weekly-agent-quality-report')?.category, 'monitoring')
+  })
+
   it('getMissionTemplate resolves known ids', () => {
     const list = templates.listMissionTemplates()
     const first = list[0]

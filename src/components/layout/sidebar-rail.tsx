@@ -305,6 +305,12 @@ export function SidebarRail({
                 <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
               </svg>
             </NavItem>
+            <NavItem view="quality" label="Quality" expanded={railExpanded} isActive={isNavActive('quality')} onClick={() => handleNavClick('quality')}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 12l2 2 4-4" />
+                <path d="M12 3l7 4v5c0 4.4-2.9 8.5-7 9-4.1-.5-7-4.6-7-9V7l7-4z" />
+              </svg>
+            </NavItem>
           </div>
 
           <div className={`flex flex-col gap-0.5 ${railExpanded ? '' : 'items-center'}`}>

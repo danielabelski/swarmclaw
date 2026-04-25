@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import { api } from '@/lib/app/api-client'
 import { useNow } from '@/hooks/use-now'
 import { useWs } from '@/hooks/use-ws'
@@ -37,6 +37,8 @@ export function RunList() {
   const [loading, setLoading] = useState(true)
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [statusFilter, setStatusFilter] = useState<SessionRunStatus | null>(null)
+  const [sourceFilter, setSourceFilter] = useState<string>('all')
+  const [query, setQuery] = useState('')
   const [selected, setSelected] = useState<SessionRunRecord | null>(null)
   const [selectedEvents, setSelectedEvents] = useState<RunEventRecord[]>([])
   const [eventsLoading, setEventsLoading] = useState(false)
@@ -84,7 +86,30 @@ export function RunList() {
     setEventsLoading(true)
   }, [])
 
-  const filtered = statusFilter ? runs.filter((r) => r.status === statusFilter) : runs
+  const sources = useMemo(() => {
+    return Array.from(new Set(runs.map((run) => run.source).filter(Boolean))).sort((a, b) => a.localeCompare(b))
+  }, [runs])
+
+  const filtered = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase()
+    return runs.filter((run) => {
+      if (statusFilter && run.status !== statusFilter) return false
+      if (sourceFilter !== 'all' && run.source !== sourceFilter) return false
+      if (!normalizedQuery) return true
+      const searchable = [
+        run.id,
+        run.sessionId,
+        run.source,
+        run.messagePreview,
+        run.error,
+        run.resultPreview,
+        run.kind,
+        run.ownerType,
+        run.ownerId,
+      ]
+      return searchable.some((value) => String(value || '').toLowerCase().includes(normalizedQuery))
+    })
+  }, [query, runs, sourceFilter, statusFilter])
   const selectedResultGrounding = selectedEvents
     .slice()
     .reverse()
@@ -129,6 +154,32 @@ export function RunList() {
             {autoRefresh && <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />}
             {autoRefresh ? 'LIVE' : 'PAUSED'}
           </button>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative flex-1 min-w-[180px]">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-3/50">
+              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search run id, source, error, or result"
+              className="w-full rounded-[8px] border border-white/[0.06] bg-white/[0.03] py-1.5 pl-8 pr-3 text-[12px] text-text outline-none transition-colors placeholder:text-text-3/45 focus:border-accent-bright/35"
+            />
+          </div>
+          <label className="flex items-center gap-2 text-[10px] font-700 uppercase tracking-[0.08em] text-text-3/60">
+            Source
+            <select
+              value={sourceFilter}
+              onChange={(event) => setSourceFilter(event.target.value)}
+              className="rounded-[8px] border border-white/[0.06] bg-white/[0.03] px-2 py-1.5 text-[11px] font-600 normal-case tracking-normal text-text outline-none"
+            >
+              <option value="all">All sources</option>
+              {sources.map((source) => (
+                <option key={source} value={source}>{source}</option>
+              ))}
+            </select>
+          </label>
         </div>
       </div>
 

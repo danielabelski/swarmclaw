@@ -27,6 +27,10 @@ type Props = {
   onOpenBuilder: () => void
   onOpenConnectors: () => void
   onOpenUsage: () => void
+  onRunEvalSuite: () => void
+  onReviewApprovals: () => void
+  onInspectFailedRuns: () => void
+  onStartReleaseQaMission: () => void
 }
 
 export function HomeLaunchpad({
@@ -42,6 +46,10 @@ export function HomeLaunchpad({
   onOpenBuilder,
   onOpenConnectors,
   onOpenUsage,
+  onRunEvalSuite,
+  onReviewApprovals,
+  onInspectFailedRuns,
+  onStartReleaseQaMission,
 }: Props) {
   return (
     <div className="max-w-[980px] mx-auto px-6 py-10">
@@ -119,6 +127,30 @@ export function HomeLaunchpad({
           description="Check cost, provider health, and activity so the workspace stays observable from the start."
           actionLabel="Open Usage"
           onClick={onOpenUsage}
+        />
+        <LaunchActionCard
+          title="Run Eval Suite"
+          description="Open the Quality Center and run scenario or suite checks against an agent before shipping."
+          actionLabel="Open Eval Lab"
+          onClick={onRunEvalSuite}
+        />
+        <LaunchActionCard
+          title="Review Approvals"
+          description="Clear pending human-loop, tool, connector, skill, agent, and budget requests from one desk."
+          actionLabel="Open Approvals"
+          onClick={onReviewApprovals}
+        />
+        <LaunchActionCard
+          title="Inspect Failed Runs"
+          description="Filter recent run failures and open replay evidence without leaving the operator workflow."
+          actionLabel="Open Run Review"
+          onClick={onInspectFailedRuns}
+        />
+        <LaunchActionCard
+          title="Start Release QA Mission"
+          description="Use a budgeted mission template to collect release readiness evidence and quality notes."
+          actionLabel="Open Missions"
+          onClick={onStartReleaseQaMission}
         />
       </div>
 

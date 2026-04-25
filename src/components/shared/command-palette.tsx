@@ -98,6 +98,7 @@ function CommandPaletteInner({ setOpen }: { setOpen: (v: boolean) => void }) {
       { id: 'providers', label: 'Providers', description: 'Model providers and endpoints', keywords: ['openai', 'anthropic', 'ollama', 'endpoint'] },
       { id: 'secrets', label: 'Secrets', description: 'Credentials and encrypted secrets', keywords: ['api key', 'token', 'credential'] },
       { id: 'autonomy', label: 'Autonomy', description: 'Estops, incidents, and runtime controls', keywords: ['estop', 'incident', 'runtime', 'safety'] },
+      { id: 'quality', label: 'Quality', description: 'Evals, approvals, run review, and release readiness', keywords: ['eval', 'approval', 'runs', 'release', 'qa'] },
       { id: 'settings', label: 'Settings', description: 'General app configuration', keywords: ['preferences', 'theme', 'heartbeat'] },
     ] as const
     for (const view of views) {

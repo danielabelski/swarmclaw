@@ -399,6 +399,16 @@ Operational docs: https://swarmclaw.ai/docs/observability
 
 ## Releases
 
+### v1.6.0 Highlights
+
+Operator Quality Center release for builders running autonomous agents in production-like workflows.
+
+- **New Quality workspace.** `/quality` brings run health, failed/running counts, pending approvals, latest eval scores, and attention shortcuts into one operator surface.
+- **Eval Lab and Approval Desk.** Existing eval and approval APIs are now exposed through a practical UI for running scenarios/suites, reviewing score evidence, and approving or denying human-loop/tool/connector/skill requests.
+- **Run Review upgrades.** The run history now has source filtering and search across run id, source, errors, results, and ownership fields while keeping the existing replay/evidence sheet.
+- **Release-ready mission templates.** New templates cover Release Candidate QA, Agent Cost Audit, Connector Smoke Test, Failed Run Triage, and Weekly Agent Quality Report using the existing mission budget/report model.
+- **Home launchpad quality actions.** First-run users can jump straight to evals, approvals, failed runs, and release QA missions from the operational launchpad.
+
 ### v1.5.71 Highlights
 
 Fast-follow release for [#60](https://github.com/swarmclawai/swarmclaw/pull/60) by [@borislavnnikolov](https://github.com/borislavnnikolov). Thanks Borislav!

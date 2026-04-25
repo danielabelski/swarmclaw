@@ -11,6 +11,7 @@ export const VIEW_LABELS: Record<AppView, string> = {
   memory: 'Memory',
 
   tasks: 'Tasks',
+  quality: 'Quality',
   missions: 'Missions',
   secrets: 'Secrets',
   wallets: 'Wallets',
@@ -59,6 +60,7 @@ export const VIEW_DESCRIPTIONS: Record<AppView, string> = {
   memory: 'Long-term agent memory store',
 
   tasks: 'Task board for agent work and queued runs',
+  quality: 'Operator quality center for evals, approvals, run review, and release readiness',
   missions: 'Autonomous goal-driven agent runs with budgets and morning reports',
   secrets: 'API keys, tokens, and encrypted credentials',
   wallets: 'Crypto wallets for agent-initiated on-chain transactions',
@@ -117,6 +119,12 @@ export const VIEW_EMPTY_STATES: Record<Exclude<AppView, 'agents' | 'home'>, { ic
     title: 'Task Board',
     description: 'A kanban board for managing agent work. Create tasks, assign them to agents, and track progress.',
     features: ['Kanban columns: Backlog, Queued, Running, Completed, Failed', 'Assign tasks to specific agents', 'Track retries, results, and logs', 'Review status without leaving the board'],
+  },
+  quality: {
+    icon: 'badge-check',
+    title: 'Quality',
+    description: 'Operator center for trusting autonomous agents before, during, and after a release.',
+    features: ['Review run health, failed work, and pending approvals', 'Run scenario and suite evals against selected agents', 'Approve or reject human-loop, tool, connector, and skill requests', 'Inspect replay evidence from recent agent runs'],
   },
   missions: {
     icon: 'target',
@@ -243,7 +251,7 @@ export const VIEW_EMPTY_STATES: Record<Exclude<AppView, 'agents' | 'home'>, { ic
 export const FULL_WIDTH_VIEWS = new Set<AppView>([
   'home', 'org_chart', 'inbox', 'chatrooms', 'protocols', 'schedules', 'secrets', 'wallets', 'providers', 'skills',
   'connectors', 'webhooks', 'mcp_servers', 'knowledge', 'extensions',
-  'usage', 'runs', 'autonomy', 'logs', 'settings', 'activity', 'projects', 'swarmfeed', 'marketplace', 'missions',
+  'usage', 'runs', 'quality', 'autonomy', 'logs', 'settings', 'activity', 'projects', 'swarmfeed', 'marketplace', 'missions',
 ])
 
 export const PANEL_SIDEBAR_VIEWS = new Set<AppView>([
