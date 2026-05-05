@@ -8,6 +8,7 @@ import {
   updateTask,
   type GitHubIssueImportRequest,
   type GitHubIssueImportResult,
+  type TaskWriteInput,
 } from '@/lib/tasks'
 import type { BoardTask, BoardTaskStatus, TaskComment } from '@/types'
 
@@ -98,7 +99,7 @@ export function useCreateTaskMutation() {
 export function useUpdateTaskMutation() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, patch }: { id: string; patch: Partial<BoardTask> }) => updateTask(id, patch),
+    mutationFn: ({ id, patch }: { id: string; patch: TaskWriteInput }) => updateTask(id, patch),
     onMutate: async ({ id, patch }) => {
       await queryClient.cancelQueries({ queryKey: taskQueryKeys.lists() })
       const snapshots = patchTaskCaches(queryClient, (current, includeArchived) => {

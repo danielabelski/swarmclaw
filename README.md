@@ -399,6 +399,15 @@ Operational docs: https://swarmclaw.ai/docs/observability
 
 ## Releases
 
+### v1.9.1 Highlights
+
+Task execution workspace release: the first Paperclip-style work-control slice for task-scoped workspaces, preview handoffs, and liveness evidence.
+
+- **Task-scoped execution workspaces.** Tasks can now provision a deterministic workspace under the SwarmClaw workspace root, preserving source cwd and project context while creating a task-local README for artifacts and handoffs.
+- **Preview and runtime metadata.** Tasks can carry preview links and runtime services, and the task board surfaces those links directly on task cards and sheets.
+- **Liveness snapshots.** Task list/read responses now compute blocked, queued, stale, retrying, ready, and terminal liveness states so operators can see why work is stopped or ready to run.
+- **Browser smoke coverage.** The browser smoke now creates a workspace-backed task and verifies the task board renders the workspace and liveness chips.
+
 ### v1.8.13 Highlights
 
 Task retry and host execute hotfix for issues [#68](https://github.com/swarmclawai/swarmclaw/issues/68) and [#69](https://github.com/swarmclawai/swarmclaw/issues/69).

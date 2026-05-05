@@ -30,11 +30,12 @@ const chipVariants = cva(
 interface InfoChipProps extends VariantProps<typeof chipVariants> {
   children: React.ReactNode
   className?: string
+  title?: string
 }
 
-export function InfoChip({ size, tone, children, className }: InfoChipProps) {
+export function InfoChip({ size, tone, children, className, title }: InfoChipProps) {
   return (
-    <span className={cn(chipVariants({ size, tone }), className)}>
+    <span title={title} className={cn(chipVariants({ size, tone }), className)}>
       {children}
     </span>
   )

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
+import { Activity, ExternalLink, FolderOpen } from 'lucide-react'
 import { useAppStore } from '@/stores/use-app-store'
 import { useNavigate } from '@/lib/app/navigation'
 import { useUpdateTaskMutation } from '@/features/tasks/queries'
@@ -8,7 +9,7 @@ import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { AgentAvatar } from '@/components/agents/agent-avatar'
 import { timeAgo } from '@/lib/time-format'
 import { InfoChip } from '@/components/ui/info-chip'
-import type { Agent, BoardTask, Project } from '@/types'
+import type { Agent, BoardTask, Project, TaskLivenessState } from '@/types'
 
 interface TaskCardProps {
   task: BoardTask
@@ -19,6 +20,22 @@ interface TaskCardProps {
   selected?: boolean
   onToggleSelect?: (id: string) => void
   index?: number
+}
+
+function livenessTone(state: TaskLivenessState | undefined): 'neutral' | 'muted' | 'warning' | 'danger' | 'success' | 'info' | 'purple' | 'accent' {
+  if (state === 'stale' || state === 'retrying') return 'warning'
+  if (state === 'dead_lettered' || state === 'failed') return 'danger'
+  if (state === 'blocked') return 'purple'
+  if (state === 'completed') return 'success'
+  if (state === 'running' || state === 'queued') return 'info'
+  return 'muted'
+}
+
+function livenessLabel(task: BoardTask): string | null {
+  const state = task.liveness?.state
+  if (!state) return null
+  if (state === 'dead_lettered') return 'dead letter'
+  return state.replace(/_/g, ' ')
 }
 
 export function TaskCard({
@@ -71,6 +88,8 @@ export function TaskCard({
   const prio = task.priority && priorityConfig[task.priority]
 
   const isBlocked = Array.isArray(task.blockedBy) && task.blockedBy.length > 0
+  const previewLink = task.previewLinks?.[0] || task.executionWorkspace?.previewLinks?.[0] || null
+  const liveness = livenessLabel(task)
   const isOverdue = task.dueAt
     && task.dueAt < now
     && task.status !== 'completed'
@@ -274,6 +293,35 @@ export function TaskCard({
                 GitHub {githubSource.repo ? `${githubSource.repo}#${githubSource.number}` : `#${githubSource.number ?? githubSource.id}`}
               </InfoChip>
             )
+          )}
+        </div>
+      )}
+
+      {(liveness || task.executionWorkspace || previewLink) && (
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {liveness && (
+            <InfoChip tone={livenessTone(task.liveness?.state)} title={task.liveness?.reason}>
+              <Activity size={10} />
+              {liveness}
+            </InfoChip>
+          )}
+          {task.executionWorkspace && (
+            <InfoChip tone="accent" title={task.executionWorkspace.path}>
+              <FolderOpen size={10} />
+              workspace
+            </InfoChip>
+          )}
+          {previewLink && (
+            <a
+              href={previewLink.url}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1.5 rounded-[7px] bg-emerald-500/10 px-2 py-1 text-[10px] font-600 text-emerald-300 hover:bg-emerald-500/15"
+            >
+              <ExternalLink size={10} />
+              {previewLink.label || 'Preview'}
+            </a>
           )}
         </div>
       )}

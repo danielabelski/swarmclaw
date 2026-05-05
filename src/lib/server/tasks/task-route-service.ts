@@ -22,6 +22,11 @@ import {
   saveTask,
   saveTaskMany,
 } from '@/lib/server/tasks/task-repository'
+import {
+  computeTaskLiveness,
+  prepareTaskExecutionWorkspace,
+  type PrepareTaskExecutionWorkspaceOptions,
+} from '@/lib/server/tasks/task-execution-workspace'
 import { resolveTaskAgentFromDescription } from '@/lib/server/tasks/task-mention'
 import { applyTaskPatch, prepareTaskCreation } from '@/lib/server/tasks/task-service'
 import { enqueueSystemEvent } from '@/lib/server/runtime/system-events'
@@ -60,7 +65,15 @@ export function prepareTasksForListing() {
   validateCompletedTasksQueue()
   recoverStalledRunningTasks()
   const allTasks = loadTasks()
-  return allTasks
+  const listed: Record<string, BoardTask> = {}
+  const now = Date.now()
+  for (const [id, task] of Object.entries(allTasks)) {
+    listed[id] = {
+      ...task,
+      liveness: computeTaskLiveness(task, allTasks, { now }),
+    }
+  }
+  return listed
 }
 
 export function updateTaskFromRoute(id: string, body: Record<string, unknown>): ServiceResult<BoardTask> {
@@ -69,6 +82,21 @@ export function updateTaskFromRoute(id: string, body: Record<string, unknown>): 
   if (!tasks[id]) return serviceFail(404, 'Task not found')
 
   const prevStatus = tasks[id].status
+  const now = Date.now()
+  const shouldProvisionWorkspace = body.provisionWorkspace === true
+  const workspaceOptions: Pick<PrepareTaskExecutionWorkspaceOptions, 'previewLinks' | 'runtimeServices'> = {
+    previewLinks: Array.isArray(body.previewLinks)
+      ? body.previewLinks as PrepareTaskExecutionWorkspaceOptions['previewLinks']
+      : undefined,
+    runtimeServices: Array.isArray(body.runtimeServices)
+      ? body.runtimeServices as PrepareTaskExecutionWorkspaceOptions['runtimeServices']
+      : undefined,
+  }
+  const patchBody = { ...body }
+  delete patchBody.provisionWorkspace
+  delete patchBody.previewLinks
+  delete patchBody.runtimeServices
+
   if (Array.isArray(body.blockedBy)) {
     const dagResult = validateDag(tasks, id, body.blockedBy)
     if (!dagResult.valid) {
@@ -83,12 +111,12 @@ export function updateTaskFromRoute(id: string, body: Record<string, unknown>): 
     }
     if (!tasks[id].comments) tasks[id].comments = []
     tasks[id].comments.push(appendedComment)
-    tasks[id].updatedAt = Date.now()
+    tasks[id].updatedAt = now
   } else {
     applyTaskPatch({
       task: tasks[id],
-      patch: body,
-      now: Date.now(),
+      patch: patchBody,
+      now,
       settings,
       preserveCompletedAt: true,
       clearProjectIdWhenNull: true,
@@ -103,22 +131,34 @@ export function updateTaskFromRoute(id: string, body: Record<string, unknown>): 
     if (oldParentId && oldParentId !== newParentId && tasks[oldParentId]) {
       const oldSubs = Array.isArray(tasks[oldParentId].subtaskIds) ? tasks[oldParentId].subtaskIds : []
       tasks[oldParentId].subtaskIds = oldSubs.filter((s: string) => s !== id)
-      tasks[oldParentId].updatedAt = Date.now()
+      tasks[oldParentId].updatedAt = now
       saveTask(oldParentId, tasks[oldParentId])
     }
     if (newParentId && tasks[newParentId]) {
       const newSubs = Array.isArray(tasks[newParentId].subtaskIds) ? tasks[newParentId].subtaskIds : []
       if (!newSubs.includes(id)) {
         tasks[newParentId].subtaskIds = [...newSubs, id]
-        tasks[newParentId].updatedAt = Date.now()
+        tasks[newParentId].updatedAt = now
         saveTask(newParentId, tasks[newParentId])
       }
     }
     tasks[id].parentTaskId = newParentId
   }
 
+  if (shouldProvisionWorkspace || workspaceOptions.previewLinks || workspaceOptions.runtimeServices) {
+    Object.assign(tasks[id], prepareTaskExecutionWorkspace(tasks[id], {
+      now,
+      actor: 'user',
+      tasks,
+      ...workspaceOptions,
+    }))
+    tasks[id].updatedAt = now
+  } else {
+    tasks[id].liveness = computeTaskLiveness(tasks[id], tasks, { now })
+  }
+
   if (prevStatus !== 'archived' && tasks[id].status === 'archived') {
-    tasks[id].archivedAt = Date.now()
+    tasks[id].archivedAt = now
   }
 
   saveTask(id, tasks[id])
@@ -180,7 +220,8 @@ export function updateTaskFromRoute(id: string, body: Record<string, unknown>): 
     const incompleteBlocker = blockers.find((bid: string) => tasks[bid] && tasks[bid].status !== 'completed')
     if (incompleteBlocker) {
       tasks[id].status = prevStatus
-      tasks[id].updatedAt = Date.now()
+      tasks[id].updatedAt = now
+      tasks[id].liveness = computeTaskLiveness(tasks[id], tasks, { now })
       saveTask(id, tasks[id])
       return serviceFail(409, 'Cannot queue: blocked by incomplete tasks')
     }
@@ -328,6 +369,26 @@ export function createTaskFromRoute(body: Record<string, unknown>): ServiceResul
         saveTask(parentTaskId, parentTask)
       }
     }
+  }
+
+  if (
+    body.provisionWorkspace === true
+    || Array.isArray(body.previewLinks)
+    || Array.isArray(body.runtimeServices)
+  ) {
+    Object.assign(task, prepareTaskExecutionWorkspace(task, {
+      now,
+      actor: 'user',
+      tasks,
+      previewLinks: Array.isArray(body.previewLinks)
+        ? body.previewLinks as PrepareTaskExecutionWorkspaceOptions['previewLinks']
+        : undefined,
+      runtimeServices: Array.isArray(body.runtimeServices)
+        ? body.runtimeServices as PrepareTaskExecutionWorkspaceOptions['runtimeServices']
+        : undefined,
+    }))
+  } else {
+    task.liveness = computeTaskLiveness(task, tasks, { now })
   }
 
   saveTask(id, task)

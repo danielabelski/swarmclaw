@@ -21,6 +21,64 @@ export interface TaskQualityGateConfig {
   requireReport?: boolean
 }
 
+export type TaskExecutionWorkspaceMode = 'task' | 'project' | 'custom'
+
+export interface TaskPreviewLink {
+  id: string
+  label: string
+  url: string
+  kind: 'web' | 'api' | 'docs' | 'custom'
+  port?: number | null
+  addedAt: number
+}
+
+export interface TaskRuntimeService {
+  id: string
+  name: string
+  status: 'planned' | 'running' | 'stopped' | 'failed' | 'unknown'
+  command?: string | null
+  url?: string | null
+  port?: number | null
+  startedAt?: number | null
+  updatedAt: number
+}
+
+export interface TaskExecutionWorkspace {
+  path: string
+  mode: TaskExecutionWorkspaceMode
+  sourceCwd?: string | null
+  projectId?: string | null
+  preparedAt: number
+  preparedBy?: string | null
+  readmePath?: string | null
+  previewLinks: TaskPreviewLink[]
+  runtimeServices: TaskRuntimeService[]
+}
+
+export type TaskLivenessState =
+  | 'not_started'
+  | 'ready'
+  | 'queued'
+  | 'blocked'
+  | 'running'
+  | 'stale'
+  | 'retrying'
+  | 'dead_lettered'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
+  | 'archived'
+
+export interface TaskLivenessSnapshot {
+  state: TaskLivenessState
+  reason: string
+  checkedAt: number
+  lastActivityAt?: number | null
+  nextWakeAt?: number | null
+  blockerTaskIds?: string[]
+  staleMs?: number | null
+}
+
 export interface BoardTask {
   id: string
   title: string
@@ -49,6 +107,10 @@ export interface BoardTask {
     type: 'image' | 'video' | 'pdf' | 'file'
     filename: string
   }>
+  executionWorkspace?: TaskExecutionWorkspace | null
+  previewLinks?: TaskPreviewLink[]
+  runtimeServices?: TaskRuntimeService[]
+  liveness?: TaskLivenessSnapshot | null
   comments?: TaskComment[]
   images?: string[]
   createdByAgentId?: string | null

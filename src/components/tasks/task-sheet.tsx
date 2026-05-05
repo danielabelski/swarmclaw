@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Activity, ExternalLink, FolderOpen, PlayCircle } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useAppStore } from '@/stores/use-app-store'
@@ -21,10 +22,11 @@ import { DirBrowser } from '@/components/shared/dir-browser'
 import { SheetFooter } from '@/components/shared/sheet-footer'
 import { inputClass } from '@/components/shared/form-styles'
 import { StructuredSessionLauncher } from '@/components/protocols/structured-session-launcher'
-import type { BoardTask, TaskComment, TaskQualityGateConfig } from '@/types'
+import type { BoardTask, TaskComment, TaskLivenessState, TaskQualityGateConfig } from '@/types'
 import { dedup, errorMessage } from '@/lib/shared-utils'
 import { SectionLabel } from '@/components/shared/section-label'
 import { AgentAvatar } from '@/components/agents/agent-avatar'
+import { InfoChip } from '@/components/ui/info-chip'
 
 function fmtTime(ts: number) {
   const d = new Date(ts)
@@ -42,6 +44,22 @@ function normalizeGateNumber(value: unknown, fallback: number, min: number, max:
       : Number.NaN
   if (!Number.isFinite(parsed)) return fallback
   return Math.max(min, Math.min(max, Math.trunc(parsed)))
+}
+
+function livenessTone(state?: TaskLivenessState): 'neutral' | 'muted' | 'warning' | 'danger' | 'success' | 'info' | 'purple' | 'accent' {
+  if (state === 'stale' || state === 'retrying') return 'warning'
+  if (state === 'dead_lettered' || state === 'failed') return 'danger'
+  if (state === 'blocked') return 'purple'
+  if (state === 'completed') return 'success'
+  if (state === 'running' || state === 'queued') return 'info'
+  return 'muted'
+}
+
+function livenessLabel(task: BoardTask): string {
+  const state = task.liveness?.state
+  if (!state) return 'unknown'
+  if (state === 'dead_lettered') return 'dead letter'
+  return state.replace(/_/g, ' ')
 }
 
 export function TaskSheet() {
@@ -85,6 +103,8 @@ export function TaskSheet() {
   const [qualityGateRequireVerification, setQualityGateRequireVerification] = useState(false)
   const [qualityGateRequireArtifact, setQualityGateRequireArtifact] = useState(false)
   const [qualityGateRequireReport, setQualityGateRequireReport] = useState(false)
+  const [provisionWorkspace, setProvisionWorkspace] = useState(false)
+  const [workspacePreparing, setWorkspacePreparing] = useState(false)
   const [structuredSessionOpen, setStructuredSessionOpen] = useState(false)
   const formInitRef = useRef<string | null>(null)
 
@@ -139,6 +159,7 @@ export function TaskSheet() {
       setQualityGateRequireVerification(gate?.requireVerification ?? defaultGateRequireVerification)
       setQualityGateRequireArtifact(gate?.requireArtifact ?? defaultGateRequireArtifact)
       setQualityGateRequireReport(gate?.requireReport ?? defaultGateRequireReport)
+      setProvisionWorkspace(false)
       formInitRef.current = initKey
       return
     }
@@ -163,6 +184,7 @@ export function TaskSheet() {
     setQualityGateRequireVerification(defaultGateRequireVerification)
     setQualityGateRequireArtifact(defaultGateRequireArtifact)
     setQualityGateRequireReport(defaultGateRequireReport)
+    setProvisionWorkspace(false)
     formInitRef.current = initKey
   }, [
     activeProjectFilter,
@@ -212,6 +234,7 @@ export function TaskSheet() {
       customFields: Object.keys(customFields).length > 0 ? customFields : undefined,
       priority: priority || undefined,
       qualityGate,
+      provisionWorkspace: !editing && provisionWorkspace ? true : undefined,
     } as Partial<BoardTask> & { title: string; description: string; agentId: string }
     try {
       if (editing) {
@@ -263,6 +286,19 @@ export function TaskSheet() {
     }
   }
 
+  const handlePrepareWorkspace = async () => {
+    if (!editing) return
+    setWorkspacePreparing(true)
+    try {
+      await updateTaskMutation.mutateAsync({ id: editing.id, patch: { provisionWorkspace: true } })
+      setDepError(null)
+    } catch (err: unknown) {
+      setDepError(errorMessage(err))
+    } finally {
+      setWorkspacePreparing(false)
+    }
+  }
+
   const handleUnarchive = async () => {
     if (editing) {
       await updateTaskMutation.mutateAsync({ id: editing.id, patch: { status: 'backlog' } })
@@ -307,6 +343,16 @@ export function TaskSheet() {
 
   const taskAgent = editing ? agents[editing.agentId] : null
   const taskProject = editing?.projectId ? projects[editing.projectId] : null
+  const previewLinks = editing
+    ? (editing.previewLinks && editing.previewLinks.length > 0
+      ? editing.previewLinks
+      : editing.executionWorkspace?.previewLinks || [])
+    : []
+  const runtimeServices = editing
+    ? (editing.runtimeServices && editing.runtimeServices.length > 0
+      ? editing.runtimeServices
+      : editing.executionWorkspace?.runtimeServices || [])
+    : []
 
   /* ───── View-only mode ───── */
   if (viewOnly && editing) {
@@ -384,6 +430,67 @@ export function TaskSheet() {
             </code>
           </div>
         )}
+
+        <div className="mb-8">
+          <SectionLabel>Execution</SectionLabel>
+          <div className="rounded-[14px] border border-white/[0.06] bg-surface p-4 space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {editing.liveness && (
+                <InfoChip tone={livenessTone(editing.liveness.state)} title={editing.liveness.reason}>
+                  <Activity size={12} />
+                  {livenessLabel(editing)}
+                </InfoChip>
+              )}
+              {editing.executionWorkspace ? (
+                <InfoChip tone="accent" title={editing.executionWorkspace.path}>
+                  <FolderOpen size={12} />
+                  Workspace ready
+                </InfoChip>
+              ) : (
+                <InfoChip tone="muted">
+                  <FolderOpen size={12} />
+                  No workspace
+                </InfoChip>
+              )}
+              {runtimeServices.map((service) => (
+                <InfoChip key={service.id} tone={service.status === 'running' ? 'success' : service.status === 'failed' ? 'danger' : 'neutral'}>
+                  <PlayCircle size={12} />
+                  {service.name}: {service.status}
+                </InfoChip>
+              ))}
+            </div>
+            {editing.executionWorkspace?.path && (
+              <code className="block text-[12px] text-text-3 font-mono break-all">{editing.executionWorkspace.path}</code>
+            )}
+            {previewLinks.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {previewLinks.map((link) => (
+                  <a
+                    key={link.id}
+                    href={link.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-[8px] bg-emerald-500/10 px-2.5 py-1.5 text-[12px] font-600 text-emerald-300 hover:bg-emerald-500/15"
+                  >
+                    <ExternalLink size={12} />
+                    {link.label || 'Preview'}
+                  </a>
+                ))}
+              </div>
+            )}
+            {!editing.executionWorkspace && (
+              <button
+                onClick={handlePrepareWorkspace}
+                disabled={workspacePreparing}
+                className="inline-flex items-center gap-2 rounded-[10px] border border-accent-bright/20 bg-accent-bright/10 px-3 py-2 text-[12px] font-600 text-accent-bright hover:bg-accent-bright/14 disabled:opacity-50"
+                style={{ fontFamily: 'inherit' }}
+              >
+                <FolderOpen size={13} />
+                {workspacePreparing ? 'Preparing...' : 'Prepare Workspace'}
+              </button>
+            )}
+          </div>
+        </div>
 
         {/* Tags */}
         {editing.tags && editing.tags.length > 0 && (
@@ -807,6 +914,71 @@ export function TaskSheet() {
           }}
           onClear={() => { setCwd(''); setFile(null) }}
         />
+      </div>
+
+      <div className="mb-8">
+        <SectionLabel>Execution Workspace</SectionLabel>
+        {editing ? (
+          <div className="rounded-[14px] border border-white/[0.06] bg-surface p-4 space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {editing.liveness && (
+                <InfoChip tone={livenessTone(editing.liveness.state)} title={editing.liveness.reason}>
+                  <Activity size={12} />
+                  {livenessLabel(editing)}
+                </InfoChip>
+              )}
+              {editing.executionWorkspace ? (
+                <InfoChip tone="accent" title={editing.executionWorkspace.path}>
+                  <FolderOpen size={12} />
+                  Workspace ready
+                </InfoChip>
+              ) : (
+                <InfoChip tone="muted">
+                  <FolderOpen size={12} />
+                  No workspace
+                </InfoChip>
+              )}
+            </div>
+            {editing.executionWorkspace?.path && (
+              <code className="block text-[12px] text-text-3 font-mono break-all">{editing.executionWorkspace.path}</code>
+            )}
+            {previewLinks.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {previewLinks.map((link) => (
+                  <a
+                    key={link.id}
+                    href={link.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-[8px] bg-emerald-500/10 px-2.5 py-1.5 text-[12px] font-600 text-emerald-300 hover:bg-emerald-500/15"
+                  >
+                    <ExternalLink size={12} />
+                    {link.label || 'Preview'}
+                  </a>
+                ))}
+              </div>
+            )}
+            <button
+              onClick={handlePrepareWorkspace}
+              disabled={workspacePreparing}
+              className="inline-flex items-center gap-2 rounded-[10px] border border-accent-bright/20 bg-accent-bright/10 px-3 py-2 text-[12px] font-600 text-accent-bright hover:bg-accent-bright/14 disabled:opacity-50"
+              style={{ fontFamily: 'inherit' }}
+            >
+              <FolderOpen size={13} />
+              {workspacePreparing ? 'Preparing...' : editing.executionWorkspace ? 'Refresh Workspace' : 'Prepare Workspace'}
+            </button>
+          </div>
+        ) : (
+          <label className="flex items-center gap-2 rounded-[14px] border border-white/[0.06] bg-surface px-4 py-3 text-[13px] text-text-2">
+            <input
+              type="checkbox"
+              checked={provisionWorkspace}
+              onChange={(e) => setProvisionWorkspace(e.target.checked)}
+              className="h-4 w-4 rounded border-white/20 accent-accent"
+            />
+            Prepare a task-scoped workspace when this task is created
+          </label>
+        )}
       </div>
 
       {/* Tags */}

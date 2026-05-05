@@ -200,6 +200,23 @@ export const TaskCreateSchema = z.object({
   retryBackoffSec: z.number().optional(),
   priority: z.enum(['low', 'medium', 'high', 'critical']).optional(),
   dueAt: z.number().nullable().optional(),
+  provisionWorkspace: z.boolean().optional(),
+  previewLinks: z.array(z.object({
+    id: z.string().optional(),
+    label: z.string().optional(),
+    url: z.string().min(1),
+    kind: z.enum(['web', 'api', 'docs', 'custom']).optional(),
+    port: z.number().nullable().optional(),
+  })).optional(),
+  runtimeServices: z.array(z.object({
+    id: z.string().optional(),
+    name: z.string().optional(),
+    status: z.enum(['planned', 'running', 'stopped', 'failed', 'unknown']).optional(),
+    command: z.string().nullable().optional(),
+    url: z.string().nullable().optional(),
+    port: z.number().nullable().optional(),
+    startedAt: z.number().nullable().optional(),
+  })).optional(),
   qualityGate: z.object({
     enabled: z.boolean().optional(),
     minResultChars: z.number().optional(),

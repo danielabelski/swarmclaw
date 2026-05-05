@@ -316,6 +316,33 @@ async function runBrowserSmoke(baseUrl: string): Promise<void> {
       anyText: ['Quality', 'Operator Quality Center', 'Eval Lab', 'Approval Desk'],
     })
 
+    const taskRes = await fetchWithTimeout(new URL('/api/tasks', baseUrl).toString(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Access-Key': auth.accessKey,
+        ...(auth.cookieHeader ? { Cookie: auth.cookieHeader } : {}),
+      },
+      body: JSON.stringify({
+        title: 'E2E task workspace',
+        description: 'Verify task-scoped workspace and preview metadata render in the task board.',
+        provisionWorkspace: true,
+        previewLinks: [{ label: 'Local preview', url: `${baseUrl}/tasks`, kind: 'web' }],
+        runtimeServices: [{ name: 'Task board', status: 'running', url: `${baseUrl}/tasks` }],
+      }),
+    }, 10_000)
+    if (!taskRes.ok) {
+      throw new Error(`Could not create task workspace smoke record: ${taskRes.status} ${await taskRes.text().catch(() => '')}`)
+    }
+
+    await waitForPageText(page, '/tasks?taskView=all', {
+      anyText: ['E2E task workspace'],
+    })
+    await page.waitForFunction(() => {
+      const text = document.body?.innerText || ''
+      return text.includes('E2E task workspace') && text.includes('workspace') && text.includes('ready')
+    }, { timeout: PAGE_TIMEOUT_MS })
+
     if (pageErrors.length > 0) {
       throw new Error(`Browser page errors:\n${pageErrors.join('\n')}`)
     }
