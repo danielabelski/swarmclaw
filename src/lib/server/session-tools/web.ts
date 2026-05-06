@@ -199,6 +199,149 @@ async function executeWebApiAction(normalized: Record<string, unknown>) {
   }, requestArgs)
 }
 
+interface ExtractedWebPage {
+  url: string
+  title: string
+  text: string
+  links: string[]
+}
+
+function normalizeHttpUrl(rawUrl: string): string {
+  const trimmed = rawUrl.trim()
+  if (!trimmed) throw new Error('URL is required.')
+  const parsed = new URL(trimmed)
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('Only http and https URLs are supported.')
+  }
+  parsed.hash = ''
+  return parsed.toString()
+}
+
+function clampNumber(value: unknown, fallback: number, min: number, max: number): number {
+  const parsed = typeof value === 'number'
+    ? value
+    : typeof value === 'string'
+      ? Number.parseInt(value, 10)
+      : Number.NaN
+  if (!Number.isFinite(parsed)) return fallback
+  return Math.max(min, Math.min(max, Math.trunc(parsed)))
+}
+
+function extractLinks($: ReturnType<typeof cheerio.load>, pageUrl: string): string[] {
+  const links: string[] = []
+  $('a[href]').each((_index, element) => {
+    const rawHref = $(element).attr('href') || ''
+    try {
+      const resolved = new URL(rawHref, pageUrl)
+      if (resolved.protocol !== 'http:' && resolved.protocol !== 'https:') return
+      resolved.hash = ''
+      const href = resolved.toString()
+      if (!links.includes(href)) links.push(href)
+    } catch {
+      // Ignore malformed links from the crawled page.
+    }
+  })
+  return links
+}
+
+async function extractReadablePage(fetchUrl: string): Promise<ExtractedWebPage> {
+  const url = normalizeHttpUrl(fetchUrl)
+  const res = await fetch(url, {
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SwarmClaw/1.0)' },
+    signal: AbortSignal.timeout(15000),
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`)
+  const contentType = res.headers.get('content-type') || ''
+  if (contentType.includes('application/pdf')) {
+    const pdfMod = await import(/* webpackIgnore: true */ 'pdf-parse')
+    const pdfParse = ((pdfMod as Record<string, unknown>).default ?? pdfMod) as (buf: Buffer) => Promise<{ text: string }>
+    const arrayBuffer = await res.arrayBuffer()
+    const result = await pdfParse(Buffer.from(arrayBuffer))
+    return { url, title: url, text: result.text, links: [] }
+  }
+
+  const html = await res.text()
+  const $ = cheerio.load(html)
+  const title = $('title').first().text().replace(/\s+/g, ' ').trim() || url
+  const links = extractLinks($, url)
+  $('script, style, noscript, nav, footer, header').remove()
+  const main = $('article, main, [role="main"]').first()
+  const text = (main.length ? main.text() : $('body').text()).replace(/\s+/g, ' ').trim()
+  return { url, title, text, links }
+}
+
+function formatExtractedPage(page: ExtractedWebPage): string {
+  const lines = [`Title: ${page.title}`, `URL: ${page.url}`, '', page.text || '(no readable text found)']
+  return truncate(lines.join('\n'), MAX_OUTPUT)
+}
+
+function formatCrawlResults(startUrl: string, pages: ExtractedWebPage[]): string {
+  if (pages.length === 0) return `No crawl results found for: ${startUrl}`
+  const sections = [`Crawl results for: ${startUrl}`, `Pages crawled: ${pages.length}`]
+  for (let index = 0; index < pages.length; index++) {
+    const page = pages[index]
+    const text = truncate(page.text || '(no readable text found)', 1200)
+    sections.push(`${index + 1}. ${page.title}\nURL: ${page.url}\nText: ${text}`)
+  }
+  return truncate(sections.join('\n\n'), MAX_OUTPUT)
+}
+
+async function executeWebExtractAction(normalized: Record<string, unknown>) {
+  const rawUrl = String(normalized.url || normalized.query || '')
+  if (!rawUrl.trim()) return 'Error: "url" is required for extract action.'
+  try {
+    return formatExtractedPage(await extractReadablePage(rawUrl))
+  } catch (err: unknown) {
+    return `Error: ${errorMessage(err)}`
+  }
+}
+
+async function executeWebCrawlAction(normalized: Record<string, unknown>) {
+  const rawUrl = String(normalized.url || normalized.query || '')
+  if (!rawUrl.trim()) return 'Error: "url" is required for crawl action.'
+
+  let startUrl: string
+  try {
+    startUrl = normalizeHttpUrl(rawUrl)
+  } catch (err: unknown) {
+    return `Error: ${errorMessage(err)}`
+  }
+
+  const maxPages = clampNumber(normalized.maxPages ?? normalized.maxResults, 5, 1, 25)
+  const maxDepth = clampNumber(normalized.maxDepth, 1, 0, 3)
+  const includeExternal = normalized.includeExternal === true || normalized.sameOrigin === false
+  const startOrigin = new URL(startUrl).origin
+  const queue: Array<{ url: string; depth: number }> = [{ url: startUrl, depth: 0 }]
+  const seen = new Set<string>()
+  const pages: ExtractedWebPage[] = []
+
+  while (queue.length > 0 && pages.length < maxPages) {
+    const next = queue.shift()
+    if (!next) break
+    if (seen.has(next.url)) continue
+    seen.add(next.url)
+
+    let page: ExtractedWebPage
+    try {
+      page = await extractReadablePage(next.url)
+    } catch (err: unknown) {
+      page = { url: next.url, title: next.url, text: `Error: ${errorMessage(err)}`, links: [] }
+    }
+    pages.push(page)
+
+    if (next.depth >= maxDepth) continue
+    for (const link of page.links) {
+      if (seen.has(link)) continue
+      if (!includeExternal && new URL(link).origin !== startOrigin) continue
+      if (queue.some((entry) => entry.url === link)) continue
+      queue.push({ url: link, depth: next.depth + 1 })
+      if (queue.length + seen.size >= maxPages * 4) break
+    }
+  }
+
+  return formatCrawlResults(startUrl, pages)
+}
+
 async function executeWebAction(args: Record<string, unknown>) {
   const normalized = normalizeToolInputArgs(args)
   const { query, url, maxResults } = normalized as { query?: string; url?: string; maxResults?: number }
@@ -219,32 +362,13 @@ async function executeWebAction(args: Record<string, unknown>) {
       const results = await provider.search(searchQuery, limit)
       if (results.length === 0) return 'No results found.'
       return formatWebSearchResults(searchQuery, results)
-    } else if (action === 'fetch') {
+    } else if (action === 'fetch' || action === 'extract') {
       const fetchUrl = url || query
-      if (!fetchUrl) return 'Error: "url" is required for fetch action.'
-      const res = await fetch(fetchUrl, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SwarmClaw/1.0)' },
-        signal: AbortSignal.timeout(15000),
-      })
-      if (!res.ok) return `HTTP ${res.status}: ${res.statusText}`
-      const contentType = res.headers.get('content-type') || ''
-      if (contentType.includes('application/pdf')) {
-        try {
-          const pdfMod = await import(/* webpackIgnore: true */ 'pdf-parse')
-          const pdfParse = ((pdfMod as Record<string, unknown>).default ?? pdfMod) as (buf: Buffer) => Promise<{ text: string }>
-          const arrayBuffer = await res.arrayBuffer()
-          const result = await pdfParse(Buffer.from(arrayBuffer))
-          return truncate(result.text, MAX_OUTPUT)
-        } catch (err: unknown) {
-          return `Error parsing PDF: ${errorMessage(err)}`
-        }
-      }
-      const html = await res.text()
-      const $ = cheerio.load(html)
-      $('script, style, noscript, nav, footer, header').remove()
-      const main = $('article, main, [role="main"]').first()
-      const text = (main.length ? main.text() : $('body').text()).replace(/\s+/g, ' ').trim()
-      return truncate(text, MAX_OUTPUT)
+      if (!fetchUrl) return `Error: "url" is required for ${action} action.`
+      const page = await extractReadablePage(fetchUrl)
+      return action === 'extract' ? formatExtractedPage(page) : truncate(page.text, MAX_OUTPUT)
+    } else if (action === 'crawl') {
+      return executeWebCrawlAction(normalized)
     } else if (action === 'api') {
       return executeWebApiAction(normalized)
     }
@@ -259,21 +383,25 @@ async function executeWebAction(args: Record<string, unknown>) {
  */
 const WebExtension: Extension = {
   name: 'Core Web',
-  description: 'Search the web, fetch content, and make HTTP API calls.',
+  description: 'Search the web, extract pages, crawl sites, and make HTTP API calls.',
   hooks: {
-    getCapabilityDescription: () => 'I can use the unified `web` tool with action `search` for research, `fetch` for reading a URL, and `api` for raw HTTP API calls with full control over method/headers/body.',
+    getCapabilityDescription: () => 'I can use `web_search` for fresh research, `web_extract` for a specific URL, `web_crawl` for bounded multi-page site reads, and the unified `web` tool for search, fetch, crawl, and raw HTTP API calls.',
   } as ExtensionHooks,
   tools: [
     {
       name: 'web',
-      description: 'Unified web access tool. Actions: search (web search), fetch (read URL content), api (raw HTTP request with method/headers/body).',
+      description: 'Unified web access tool. Actions: search (web search), fetch/extract (read URL content), crawl (bounded same-origin crawl), api (raw HTTP request with method/headers/body).',
       parameters: {
         type: 'object',
         properties: {
-          action: { type: 'string', enum: ['search', 'fetch', 'api'] },
+          action: { type: 'string', enum: ['search', 'fetch', 'extract', 'crawl', 'api'] },
           query: { type: 'string' },
           url: { type: 'string' },
           maxResults: { type: 'number' },
+          maxPages: { type: 'number', description: 'Maximum pages for crawl action, default 5, max 25' },
+          maxDepth: { type: 'number', description: 'Maximum crawl depth, default 1, max 3' },
+          includeExternal: { type: 'boolean', description: 'Allow crawl to leave the starting origin, default false' },
+          sameOrigin: { type: 'boolean', description: 'Keep crawl on the starting origin when true, default true' },
           method: { type: 'string', enum: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'], description: 'HTTP method (for api action)' },
           headers: { type: 'object', additionalProperties: { type: 'string' }, description: 'Request headers (for api action)' },
           body: { type: 'string', description: 'Request body (for api action)' },
@@ -283,6 +411,71 @@ const WebExtension: Extension = {
         required: ['action']
       },
       execute: async (args) => executeWebAction(args)
+    },
+    {
+      name: 'web_search',
+      description: 'Search the web and return ranked results with URLs and snippets.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string' },
+          maxResults: { type: 'number' },
+        },
+        required: ['query'],
+      },
+      planning: {
+        capabilities: ['research.search'],
+        disciplineGuidance: ['Use `web_search` for fresh information, then fetch or extract only the sources you need.'],
+      },
+      execute: async (args) => executeWebAction({ ...normalizeToolInputArgs(args), action: 'search' }),
+    },
+    {
+      name: 'web_fetch',
+      description: 'Read a specific URL and return readable page text.',
+      parameters: {
+        type: 'object',
+        properties: { url: { type: 'string' } },
+        required: ['url'],
+      },
+      planning: {
+        capabilities: ['research.fetch'],
+        disciplineGuidance: ['Use `web_fetch` when you already have a URL and only need the readable text.'],
+      },
+      execute: async (args) => executeWebAction({ ...normalizeToolInputArgs(args), action: 'fetch' }),
+    },
+    {
+      name: 'web_extract',
+      description: 'Extract readable content from a URL with title and source URL included.',
+      parameters: {
+        type: 'object',
+        properties: { url: { type: 'string' } },
+        required: ['url'],
+      },
+      planning: {
+        capabilities: ['research.fetch'],
+        disciplineGuidance: ['Use `web_extract` for source-grounded page reads where the title and URL should stay attached to the extracted text.'],
+      },
+      execute: async (args) => executeWebExtractAction(normalizeToolInputArgs(args)),
+    },
+    {
+      name: 'web_crawl',
+      description: 'Crawl a small set of pages starting from one URL. Same-origin by default, bounded by maxPages and maxDepth.',
+      parameters: {
+        type: 'object',
+        properties: {
+          url: { type: 'string' },
+          maxPages: { type: 'number' },
+          maxDepth: { type: 'number' },
+          includeExternal: { type: 'boolean' },
+          sameOrigin: { type: 'boolean' },
+        },
+        required: ['url'],
+      },
+      planning: {
+        capabilities: ['research.crawl'],
+        disciplineGuidance: ['Use `web_crawl` only when the task needs multiple pages from the same site. Keep maxPages low and summarize after one crawl.'],
+      },
+      execute: async (args) => executeWebCrawlAction(normalizeToolInputArgs(args)),
     }
   ]
 }
@@ -303,6 +496,40 @@ export function buildWebTools(bctx: ToolBuildContext): StructuredToolInterface[]
         {
           name: 'web',
           description: WebExtension.tools![0].description,
+          schema: z.object({}).passthrough()
+        }
+      )
+    )
+    tools.push(
+      tool(
+        async (args) => executeWebAction({ ...normalizeToolInputArgs((args ?? {}) as Record<string, unknown>), action: 'search' }),
+        {
+          name: 'web_search',
+          description: 'Search the web and return ranked results with URLs and snippets.',
+          schema: z.object({}).passthrough()
+        }
+      ),
+      tool(
+        async (args) => executeWebAction({ ...normalizeToolInputArgs((args ?? {}) as Record<string, unknown>), action: 'fetch' }),
+        {
+          name: 'web_fetch',
+          description: 'Read a specific URL and return readable page text.',
+          schema: z.object({}).passthrough()
+        }
+      ),
+      tool(
+        async (args) => executeWebExtractAction(normalizeToolInputArgs((args ?? {}) as Record<string, unknown>)),
+        {
+          name: 'web_extract',
+          description: 'Extract readable content from a URL with title and source URL included.',
+          schema: z.object({}).passthrough()
+        }
+      ),
+      tool(
+        async (args) => executeWebCrawlAction(normalizeToolInputArgs((args ?? {}) as Record<string, unknown>)),
+        {
+          name: 'web_crawl',
+          description: 'Crawl a small set of pages starting from one URL. Same-origin by default, bounded by maxPages and maxDepth.',
           schema: z.object({}).passthrough()
         }
       )

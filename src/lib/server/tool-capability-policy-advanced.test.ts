@@ -255,12 +255,12 @@ describe('explicit allows override mode blocks', () => {
 // Category blocks
 // ---------------------------------------------------------------------------
 describe('category blocks', () => {
-  it('blocking network category blocks web, web_search, web_fetch', () => {
-    const d = resolveSessionToolPolicy(['web', 'web_search', 'web_fetch', 'memory'], {
+  it('blocking network category blocks granular web tools', () => {
+    const d = resolveSessionToolPolicy(['web', 'web_search', 'web_fetch', 'web_extract', 'web_crawl', 'memory'], {
       capabilityBlockedCategories: ['network'],
     })
     assert.deepStrictEqual(d.enabledExtensions, ['memory'])
-    assert.equal(d.blockedExtensions.length, 3)
+    assert.equal(d.blockedExtensions.length, 5)
     for (const b of d.blockedExtensions) {
       assert.match(b.reason, /category "network"/)
     }

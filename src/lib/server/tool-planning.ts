@@ -7,6 +7,7 @@ import { canonicalizeExtensionId, expandExtensionIds } from './tool-aliases'
 export const TOOL_CAPABILITY = {
   researchSearch: 'research.search',
   researchFetch: 'research.fetch',
+  researchCrawl: 'research.crawl',
   browserNavigate: 'browser.navigate',
   browserCapture: 'browser.capture',
   artifactPdf: 'artifact.pdf',
@@ -94,6 +95,36 @@ const CORE_TOOL_PLANNING: Record<string, LegacyToolPlanningEntry[]> = {
         {
           capability: TOOL_CAPABILITY.researchFetch,
           patterns: ['read', 'summarize', 'summarise', 'analyze', 'analyse', 'extract', 'review', 'article', 'page', 'url', 'link'],
+          requireLiteralUrl: true,
+        },
+      ],
+    },
+    {
+      toolName: 'web_extract',
+      capabilities: [TOOL_CAPABILITY.researchFetch],
+      disciplineGuidance: [
+        'For `web_extract`, use `{"url":"https://..."}` when source title and URL should remain attached to extracted page text.',
+        'Extract the exact pages you need, then synthesize. Do not extract the same page repeatedly.',
+      ],
+      requestMatchers: [
+        {
+          capability: TOOL_CAPABILITY.researchFetch,
+          patterns: ['extract', 'readable content', 'page text', 'source text'],
+          requireLiteralUrl: true,
+        },
+      ],
+    },
+    {
+      toolName: 'web_crawl',
+      capabilities: [TOOL_CAPABILITY.researchCrawl],
+      disciplineGuidance: [
+        'For `web_crawl`, use `{"url":"https://...","maxPages":5,"maxDepth":1}` only when a task needs several pages from the same site.',
+        'Keep crawls bounded and summarize after one crawl. Prefer `web_extract` for a single known URL.',
+      ],
+      requestMatchers: [
+        {
+          capability: TOOL_CAPABILITY.researchCrawl,
+          patterns: ['crawl', 'site map', 'sitemap', 'multiple pages', 'whole site', 'scan site'],
           requireLiteralUrl: true,
         },
       ],

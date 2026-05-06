@@ -135,11 +135,13 @@ describe('expandExtensionIds', () => {
     }
   })
 
-  it('web expands to include web_search and web_fetch', () => {
+  it('web expands to include granular web tools', () => {
     const result = expandExtensionIds(['web'])
     assert.ok(result.includes('web'))
     assert.ok(result.includes('web_search'))
     assert.ok(result.includes('web_fetch'))
+    assert.ok(result.includes('web_extract'))
+    assert.ok(result.includes('web_crawl'))
   })
 
   it('removes duplicates after expansion', () => {
@@ -199,12 +201,14 @@ describe('expandExtensionIds', () => {
 // getExtensionAliases
 // ---------------------------------------------------------------------------
 describe('getExtensionAliases', () => {
-  it('web returns [web, web_search, web_fetch]', () => {
+  it('web returns the full web alias group', () => {
     const result = getExtensionAliases('web')
     assert.ok(result.includes('web'))
     assert.ok(result.includes('web_search'))
     assert.ok(result.includes('web_fetch'))
-    assert.equal(result.length, 5) // web, web_search, web_fetch, http_request, http
+    assert.ok(result.includes('web_extract'))
+    assert.ok(result.includes('web_crawl'))
+    assert.equal(result.length, 7) // web, web_search, web_fetch, web_extract, web_crawl, http_request, http
   })
 
   it('web_search returns the same group as web', () => {

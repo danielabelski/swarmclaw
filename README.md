@@ -409,6 +409,15 @@ Operational docs: https://swarmclaw.ai/docs/observability
 
 ## Releases
 
+### v1.9.22 Highlights
+
+Research tools release: agents now get direct `web_extract` and `web_crawl` tools alongside `web_search`, `web_fetch`, and the unified `web` tool.
+
+- **Source-grounded extraction.** `web_extract` returns a page title, canonical URL, and readable content for known source URLs.
+- **Bounded crawls.** `web_crawl` walks same-origin links by default with conservative page and depth caps, plus an explicit external-link opt-in.
+- **Better routing.** Tool aliases, capability policy, planning hints, continuation recovery, and the chat UI all recognize the granular research tools.
+- **Regression coverage.** New tests cover action inference, tool-call translation, direct tool registration, extraction cleanup, and same-origin crawl bounds.
+
 ### v1.9.21 Highlights
 
 Provider diagnostics release: connection checks now return a structured step timeline across setup, provider settings, and agent editing.

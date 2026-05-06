@@ -664,6 +664,8 @@ if (!IS_BUILD_BOOTSTRAP) {
     'files',
     'web_search',
     'web_fetch',
+    'web_extract',
+    'web_crawl',
     'browser',
     'manage_agents',
     'manage_tasks',

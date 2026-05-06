@@ -127,6 +127,27 @@ export function translateRequestedToolInvocation(
       },
     }
   }
+  if (requestedName === 'web_extract') {
+    return {
+      toolName: 'web',
+      args: {
+        action: 'extract',
+        url: rawArgs.url,
+      },
+    }
+  }
+  if (requestedName === 'web_crawl') {
+    return {
+      toolName: 'web',
+      args: {
+        action: 'crawl',
+        url: rawArgs.url || rawArgs.query,
+        maxPages: rawArgs.maxPages ?? rawArgs.maxResults,
+        maxDepth: rawArgs.maxDepth,
+        includeExternal: rawArgs.includeExternal,
+      },
+    }
+  }
   if (requestedName === 'delegate_to_claude_code') {
     return { toolName: 'delegate', args: { ...rawArgs, backend: 'claude' } }
   }

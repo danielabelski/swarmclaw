@@ -196,7 +196,7 @@ function getRequestedArtifactStatus(params: {
 
 export function countExternalExecutionResearchSteps(toolEvents: MessageToolEvent[]): number {
   return toolEvents.filter((event) => {
-    return ['http_request', 'web', 'web_search', 'web_fetch', 'browser'].includes(event.name)
+    return ['http_request', 'web', 'web_search', 'web_fetch', 'web_extract', 'web_crawl', 'browser'].includes(event.name)
   }).length
 }
 
@@ -300,6 +300,8 @@ const RECOVERABLE_TOOL_ERROR_NAMES = new Set([
   'web',
   'web_search',
   'web_fetch',
+  'web_extract',
+  'web_crawl',
   'http_request',
 ])
 
@@ -390,6 +392,8 @@ export function getToolFrequencyHint(toolName: string, sessionExtensions: string
     case 'http_request':
     case 'web_search':
     case 'web_fetch':
+    case 'web_extract':
+    case 'web_crawl':
       return 'Hint: You have done extensive research. Stop gathering more sources and use the information you already have to complete the task.'
 
     case 'spawn_subagent':
@@ -490,7 +494,7 @@ function buildDeliverableFollowthroughPrompt(params: {
   }
 
   if (
-    params.toolEvents.some((event) => ['web', 'web_search', 'web_fetch', 'browser', 'http_request'].includes(event.name))
+    params.toolEvents.some((event) => ['web', 'web_search', 'web_fetch', 'web_extract', 'web_crawl', 'browser', 'http_request'].includes(event.name))
     && !params.toolEvents.some((event) => ['files', 'write_file', 'edit_file', 'shell', 'execute_command'].includes(event.name))
   ) {
     lines.push(

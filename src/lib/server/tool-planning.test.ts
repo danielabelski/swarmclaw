@@ -12,10 +12,11 @@ function uniqueExtensionId(prefix: string): string {
 
 describe('tool-planning', () => {
   it('collects core planning metadata for aliased built-in tools', () => {
-    const view = getEnabledToolPlanningView(['web_search', 'web_fetch', 'browser', 'manage_connectors'])
+    const view = getEnabledToolPlanningView(['web_search', 'web_fetch', 'web_extract', 'web_crawl', 'browser', 'manage_connectors'])
 
     assert.deepEqual(view.displayToolIds, ['browser', 'manage_connectors', 'web'])
     assert.deepEqual(getToolsForCapability(['web_search'], TOOL_CAPABILITY.researchSearch), ['web_search'])
+    assert.deepEqual(getToolsForCapability(['web_crawl'], TOOL_CAPABILITY.researchCrawl), ['web_crawl'])
     assert.deepEqual(getToolsForCapability(['manage_connectors'], TOOL_CAPABILITY.deliveryVoiceNote), ['connector_message_tool'])
   })
 

@@ -4,11 +4,11 @@ const INJECTION_PATTERNS: Array<{ code: string; re: RegExp; note: string }> = [
   { code: 'ignore_instructions', re: /\bignore (?:all |any |the )?(?:previous|prior|above|system|developer) instructions\b/i, note: 'tries to override existing instructions' },
   { code: 'reveal_prompt', re: /\b(?:reveal|show|print|dump)\b[\s\S]{0,40}\b(?:system prompt|developer prompt|hidden prompt)\b/i, note: 'asks for hidden prompt data' },
   { code: 'credential_theft', re: /\b(?:api key|token|password|secret|credential)s?\b[\s\S]{0,40}\b(?:send|share|reveal|print|dump|exfiltrat)/i, note: 'asks for secrets or credentials' },
-  { code: 'tool_override', re: /\b(?:call|use|run)\b[\s\S]{0,40}\b(?:shell|terminal|browser|http_request|web_fetch|connector_message_tool)\b[\s\S]{0,40}\b(?:without|ignore)\b/i, note: 'tries to direct tool use by bypassing policy' },
+  { code: 'tool_override', re: /\b(?:call|use|run)\b[\s\S]{0,40}\b(?:shell|terminal|browser|http_request|web_fetch|web_extract|web_crawl|connector_message_tool)\b[\s\S]{0,40}\b(?:without|ignore)\b/i, note: 'tries to direct tool use by bypassing policy' },
   { code: 'workflow_override', re: /\b(?:act as|pretend to be)\b[\s\S]{0,40}\b(?:system|developer|administrator|operator)\b/i, note: 'tries to impersonate a higher-priority role' },
 ]
 
-const WEB_TOOL_NAMES = new Set(['browser', 'web_search', 'web_fetch', 'http_request'])
+const WEB_TOOL_NAMES = new Set(['browser', 'web_search', 'web_fetch', 'web_extract', 'web_crawl', 'http_request'])
 
 function normalizeMode(value: unknown): 'off' | 'warn' | 'block' {
   const normalized = typeof value === 'string' ? value.trim().toLowerCase() : ''

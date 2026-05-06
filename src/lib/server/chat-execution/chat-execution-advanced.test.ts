@@ -407,6 +407,33 @@ describe('translateRequestedToolInvocation advanced', () => {
     assert.equal(args.action, 'search')
     assert.equal(args.query, 'test query')
   })
+
+  it('maps web_extract to web with action=extract', () => {
+    const { toolName, args } = translateRequestedToolInvocation(
+      'web_extract',
+      { url: 'https://example.com/source' },
+      '',
+      ['web'],
+    )
+    assert.equal(toolName, 'web')
+    assert.equal(args.action, 'extract')
+    assert.equal(args.url, 'https://example.com/source')
+  })
+
+  it('maps web_crawl to web with bounded crawl arguments', () => {
+    const { toolName, args } = translateRequestedToolInvocation(
+      'web_crawl',
+      { url: 'https://example.com/', maxPages: 4, maxDepth: 1, includeExternal: false },
+      '',
+      ['web'],
+    )
+    assert.equal(toolName, 'web')
+    assert.equal(args.action, 'crawl')
+    assert.equal(args.url, 'https://example.com/')
+    assert.equal(args.maxPages, 4)
+    assert.equal(args.maxDepth, 1)
+    assert.equal(args.includeExternal, false)
+  })
 })
 
 // ---------------------------------------------------------------------------

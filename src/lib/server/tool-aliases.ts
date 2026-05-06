@@ -3,7 +3,7 @@ const EXTENSION_ALIAS_GROUPS: string[][] = [
   ['execute', 'sandbox'],
   ['files', 'read_file', 'write_file', 'list_files', 'copy_file', 'move_file', 'delete_file', 'send_file'],
   ['edit_file'],
-  ['web', 'web_search', 'web_fetch', 'http_request', 'http'],
+  ['web', 'web_search', 'web_fetch', 'web_extract', 'web_crawl', 'http_request', 'http'],
   ['browser', 'openclaw_browser'],
   ['delegate', 'claude_code', 'codex_cli', 'opencode_cli', 'gemini_cli', 'copilot_cli', 'droid_cli', 'cursor_cli', 'qwen_code_cli', 'delegate_to_claude_code', 'delegate_to_codex_cli', 'delegate_to_opencode_cli', 'delegate_to_gemini_cli', 'delegate_to_copilot_cli', 'delegate_to_droid_cli', 'delegate_to_cursor_cli', 'delegate_to_qwen_code_cli'],
   ['manage_platform'],

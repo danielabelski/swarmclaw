@@ -19,6 +19,9 @@ const NOTABLE_TOOLS: Record<string, { label: string; color: string; icon: 'brain
   delegate_to_agent: { label: 'Delegating task', color: '#6366F1', icon: 'delegate' },
   check_delegation_status: { label: 'Checking delegation', color: '#6366F1', icon: 'delegate' },
   web_search: { label: 'Searched the web', color: '#22C55E', icon: 'search' },
+  web_fetch: { label: 'Read a web page', color: '#22C55E', icon: 'search' },
+  web_extract: { label: 'Extracted a web page', color: '#22C55E', icon: 'search' },
+  web_crawl: { label: 'Crawled a site', color: '#22C55E', icon: 'search' },
   connector_message_tool: { label: 'Sent a message', color: '#F97316', icon: 'message' },
 }
 
@@ -35,6 +38,7 @@ function extractSnippet(toolName: string, toolInput: string): string | null {
     if (toolName === 'check_delegation_status' && parsed.agentName) return parsed.agentName
     if (toolName.startsWith('delegate_to_') && parsed.task) return parsed.task
     if (toolName === 'web_search' && parsed.query) return parsed.query
+    if ((toolName === 'web_fetch' || toolName === 'web_extract' || toolName === 'web_crawl') && parsed.url) return parsed.url
     if (toolName === 'connector_message_tool' && parsed.to) return parsed.to
   } catch { /* ignore parse errors */ }
   return null

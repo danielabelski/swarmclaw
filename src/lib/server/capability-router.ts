@@ -144,6 +144,7 @@ export function routeTaskIntent(
       [
         TOOL_CAPABILITY.researchSearch,
         TOOL_CAPABILITY.researchFetch,
+        TOOL_CAPABILITY.researchCrawl,
         ...(wantsScreenshots ? [TOOL_CAPABILITY.browserCapture] : []),
         ...(wantsVoiceDelivery ? [TOOL_CAPABILITY.deliveryVoiceNote] : []),
         ...(wantsOutboundDelivery ? [TOOL_CAPABILITY.deliveryMedia, TOOL_CAPABILITY.deliveryMessage] : []),

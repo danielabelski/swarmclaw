@@ -26,7 +26,7 @@ test('routeTaskIntent keeps coding prompts prioritized over memory keywords', ()
 test('routeTaskIntent keeps hybrid research-plus-media prompts in research intent', () => {
   const decision = routeTaskIntent(
     'Can you tell me more if there is any news related to the US-Iran war, and can you send me some screenshots and give me a summary and maybe send me a voice note about it?',
-    ['web_search', 'web_fetch', 'browser', 'manage_connectors'],
+    ['web_search', 'web_fetch', 'web_crawl', 'browser', 'manage_connectors'],
     null,
     makeClassification({
       taskIntent: 'research',
@@ -39,7 +39,7 @@ test('routeTaskIntent keeps hybrid research-plus-media prompts in research inten
   )
 
   assert.equal(decision.intent, 'research')
-  assert.deepEqual(decision.preferredTools, ['web_search', 'web_fetch', 'browser', 'connector_message_tool'])
+  assert.deepEqual(decision.preferredTools, ['web_search', 'web_fetch', 'web_extract', 'web_crawl', 'browser', 'connector_message_tool'])
 })
 
 test('routeTaskIntent treats direct voice-note delivery as outreach', () => {
@@ -72,7 +72,7 @@ test('routeTaskIntent treats keep-watching update requests as research even with
   )
 
   assert.equal(decision.intent, 'research')
-  assert.deepEqual(decision.preferredTools, ['web_search', 'web_fetch'])
+  assert.deepEqual(decision.preferredTools, ['web_search', 'web_fetch', 'web_extract', 'web_crawl'])
 })
 
 test('routeTaskIntent uses structured classification when available', () => {
@@ -99,7 +99,7 @@ test('routeTaskIntent uses structured classification when available', () => {
   )
 
   assert.equal(decision.intent, 'browsing')
-  assert.deepEqual(decision.preferredTools, ['browser', 'web_fetch'])
+  assert.deepEqual(decision.preferredTools, ['browser', 'web_fetch', 'web_extract'])
 })
 
 function makeClassification(overrides: Partial<MessageClassification>): MessageClassification {

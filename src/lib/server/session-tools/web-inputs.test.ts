@@ -20,6 +20,11 @@ describe('inferWebActionFromArgs', () => {
     assert.equal(inferWebActionFromArgs({ action: 'search', url: 'https://example.com/article' }), 'search')
   })
 
+  it('preserves explicit extract and crawl actions', () => {
+    assert.equal(inferWebActionFromArgs({ action: 'extract', url: 'https://example.com/article' }), 'extract')
+    assert.equal(inferWebActionFromArgs({ action: 'crawl', url: 'https://example.com/' }), 'crawl')
+  })
+
   it('normalizes stringified browser form payloads', () => {
     const normalized = normalizeBrowserActionParams({
       input: JSON.stringify({

@@ -349,7 +349,7 @@ export async function processIterationEvents(opts: ProcessIterationEventsOpts): 
       }
       if (
         boundedExternalExecutionTask
-        && ['http_request', 'web', 'web_search', 'web_fetch', 'browser'].includes(toolName)
+        && ['http_request', 'web', 'web_search', 'web_fetch', 'web_extract', 'web_crawl', 'browser'].includes(toolName)
         && countExternalExecutionResearchSteps(state.streamedToolEvents) >= 5
         && countDistinctExternalResearchHosts(state.streamedToolEvents) >= 3
       ) {

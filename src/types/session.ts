@@ -218,6 +218,8 @@ export type SessionTool =
   | 'qwen_code_cli'
   | 'web_search'
   | 'web_fetch'
+  | 'web_extract'
+  | 'web_crawl'
   | 'edit_file'
   | 'process'
   | 'spawn_subagent'
