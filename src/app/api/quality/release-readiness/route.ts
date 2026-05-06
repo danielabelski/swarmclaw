@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { evaluateEvalGate } from '@/lib/server/eval/baseline'
 import { getOperationPulse, normalizeOperationPulseRange } from '@/lib/server/operations/operation-pulse'
+import { buildArchitectureHealthReport } from '@/lib/quality/architecture-health'
 import { buildReleaseReadinessReport } from '@/lib/quality/release-readiness'
 import { errorMessage } from '@/lib/shared-utils'
 
@@ -28,7 +29,11 @@ export async function GET(req: Request) {
       })
       : null
 
-    return NextResponse.json(buildReleaseReadinessReport({ pulse, evalGate }))
+    return NextResponse.json(buildReleaseReadinessReport({
+      pulse,
+      evalGate,
+      architectureHealth: buildArchitectureHealthReport(),
+    }))
   } catch (err: unknown) {
     return NextResponse.json(
       { error: errorMessage(err) },

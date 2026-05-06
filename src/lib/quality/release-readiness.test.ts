@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
+import { buildArchitectureHealthReport } from './architecture-health'
 import { buildReleaseReadinessReport } from './release-readiness'
 import type { EvalGateResult } from '@/lib/server/eval/types'
 import type { OperationPulse } from '@/types'
@@ -125,5 +126,17 @@ describe('release readiness report', () => {
     assert.equal(report.nextActions[0]?.id, 'run:failed')
     assert.ok(report.checks.some((check) => check.code === 'failed_runs_present'))
     assert.ok(report.checks.some((check) => check.code === 'pending_approvals_present'))
+  })
+
+  it('includes architecture health when supplied', () => {
+    const report = buildReleaseReadinessReport({
+      pulse: pulse(),
+      evalGate: evalGate(),
+      architectureHealth: buildArchitectureHealthReport({ generatedAt: now }),
+    })
+
+    assert.equal(report.status, 'ready')
+    assert.equal(report.architectureHealth?.status, 'healthy')
+    assert.ok(report.checks.some((check) => check.code === 'architecture_health_passed'))
   })
 })

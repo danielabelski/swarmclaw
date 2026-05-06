@@ -15,6 +15,7 @@ import {
   summarizeEvalRuns,
   summarizeRunHealth,
 } from '@/lib/quality/quality-summary'
+import type { ArchitectureHealthReport, ArchitectureHealthStatus } from '@/lib/quality/architecture-health'
 import type { ReleaseReadinessReport, ReleaseReadinessStatus } from '@/lib/quality/release-readiness'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/stores/use-app-store'
@@ -142,6 +143,18 @@ function readinessScoreTone(status: ReleaseReadinessStatus): string {
   return 'text-rose-300'
 }
 
+function architectureStatusClass(status: ArchitectureHealthStatus): string {
+  if (status === 'healthy') return 'border-emerald-500/25 bg-emerald-500/10 text-emerald-200'
+  if (status === 'watch') return 'border-amber-500/25 bg-amber-500/10 text-amber-200'
+  return 'border-rose-500/25 bg-rose-500/10 text-rose-200'
+}
+
+function architectureScoreTone(status: ArchitectureHealthStatus): string {
+  if (status === 'healthy') return 'text-emerald-300'
+  if (status === 'watch') return 'text-amber-300'
+  return 'text-rose-300'
+}
+
 function ReleaseReadinessPanel({
   report,
   loading,
@@ -242,6 +255,118 @@ function ReleaseReadinessPanel({
                         </span>
                       </div>
                       <div className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-text-3/65">{action.summary}</div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function ArchitectureHealthPanel({
+  report,
+  loading,
+  onRefresh,
+  onOpenHref,
+}: {
+  report: ArchitectureHealthReport | null
+  loading: boolean
+  onRefresh: () => void
+  onOpenHref: (href: string) => void
+}) {
+  return (
+    <section className="rounded-[16px] border border-white/[0.06] bg-white/[0.025] p-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <div className="text-[11px] font-700 uppercase tracking-[0.12em] text-accent-bright/70">Architecture Health</div>
+          <h2 className="mt-1 font-display text-[17px] font-700 text-text">Runtime ownership map</h2>
+          <p className="mt-1 max-w-[680px] text-[12px] leading-relaxed text-text-3/65">
+            Inventories dispatch, memory, startup, and quality surfaces with owners, guardrails, and test evidence.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onRefresh}
+          disabled={loading}
+          className="shrink-0 rounded-[10px] border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-[12px] font-800 text-text-2 transition-colors hover:bg-white/[0.08] disabled:opacity-40"
+        >
+          {loading ? 'Checking' : 'Refresh map'}
+        </button>
+      </div>
+
+      {!report ? (
+        <div className="mt-4 rounded-[12px] border border-dashed border-white/[0.08] bg-white/[0.02] px-4 py-5 text-[12px] text-text-3/65">
+          {loading ? 'Building architecture health report...' : 'No architecture health report is available yet.'}
+        </div>
+      ) : (
+        <div className="mt-4 grid gap-4 xl:grid-cols-[260px_1fr]">
+          <div className="rounded-[14px] border border-white/[0.06] bg-white/[0.025] p-4">
+            <span className={cn('inline-flex rounded-full border px-2.5 py-1 text-[10px] font-800 uppercase tracking-[0.1em]', architectureStatusClass(report.status))}>
+              {report.status}
+            </span>
+            <div className={cn('mt-4 font-display text-[42px] font-700 tracking-[-0.04em]', architectureScoreTone(report.status))}>{report.score}</div>
+            <div className="mt-1 text-[12px] text-text-3/65">health score</div>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <div className="rounded-[10px] bg-white/[0.035] px-3 py-2">
+                <div className="text-[10px] font-700 uppercase tracking-[0.1em] text-text-3/50">Surfaces</div>
+                <div className="mt-1 text-[18px] font-800 text-text">{report.surfaceCount}</div>
+              </div>
+              <div className="rounded-[10px] bg-white/[0.035] px-3 py-2">
+                <div className="text-[10px] font-700 uppercase tracking-[0.1em] text-text-3/50">Guardrails</div>
+                <div className="mt-1 text-[18px] font-800 text-text">{report.guardrailCount}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-3 lg:grid-cols-2">
+            <div className="rounded-[14px] border border-white/[0.06] bg-white/[0.02] p-3">
+              <div className="text-[12px] font-800 text-text">Domains</div>
+              <div className="mt-3 grid gap-2">
+                {report.domains.map((domain) => (
+                  <div key={domain.id} className="rounded-[10px] border border-white/[0.06] bg-white/[0.025] px-3 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-[12px] font-800 text-text">{domain.title}</div>
+                      <span className={cn('rounded-full border px-2 py-0.5 text-[9px] font-800 uppercase tracking-[0.08em]', architectureStatusClass(domain.status))}>
+                        {domain.status}
+                      </span>
+                    </div>
+                    <div className="mt-1 text-[11px] leading-relaxed text-text-3/65">{domain.surfaces.length} surfaces, {domain.testPaths.length} evidence paths</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-[14px] border border-white/[0.06] bg-white/[0.02] p-3">
+              <div className="text-[12px] font-800 text-text">Checks</div>
+              <div className="mt-3 flex flex-col gap-2">
+                {report.nextActions.length === 0 ? (
+                  report.checks.filter((check) => check.status === 'healthy').slice(0, 4).map((check) => (
+                    <button
+                      key={check.code}
+                      type="button"
+                      onClick={() => check.href && onOpenHref(check.href)}
+                      className="rounded-[10px] border border-emerald-500/20 bg-emerald-500/[0.05] px-3 py-2 text-left text-emerald-200 transition-colors hover:bg-emerald-500/[0.08]"
+                    >
+                      <div className="text-[11px] font-800 uppercase tracking-[0.08em]">{check.status}</div>
+                      <div className="mt-1 text-[12px] font-700 text-text">{check.title}</div>
+                      <div className="mt-0.5 text-[11px] leading-relaxed text-text-3/70">{check.summary}</div>
+                    </button>
+                  ))
+                ) : (
+                  report.nextActions.slice(0, 5).map((action) => (
+                    <button
+                      key={action.id}
+                      type="button"
+                      onClick={() => onOpenHref(action.href)}
+                      className={cn('rounded-[10px] border px-3 py-2 text-left transition-colors hover:bg-white/[0.08]', architectureStatusClass(action.severity))}
+                    >
+                      <div className="text-[11px] font-800 uppercase tracking-[0.08em]">{action.severity}</div>
+                      <div className="mt-1 text-[12px] font-700 text-text">{action.title}</div>
+                      <div className="mt-0.5 text-[11px] leading-relaxed text-text-3/70">{action.summary}</div>
                     </button>
                   ))
                 )}
@@ -471,6 +596,8 @@ export function QualityWorkspace() {
   const [evalBaselineBusy, setEvalBaselineBusy] = useState(false)
   const [releaseReadiness, setReleaseReadiness] = useState<ReleaseReadinessReport | null>(null)
   const [releaseReadinessLoading, setReleaseReadinessLoading] = useState(false)
+  const [architectureHealth, setArchitectureHealth] = useState<ArchitectureHealthReport | null>(null)
+  const [architectureHealthLoading, setArchitectureHealthLoading] = useState(false)
   const [approvalBusy, setApprovalBusy] = useState<string | null>(null)
 
   useEffect(() => {
@@ -578,9 +705,26 @@ export function QualityWorkspace() {
     }
   }, [evalGateScope, selectedAgentId, selectedScenarioId, selectedSuite])
 
+  const loadArchitectureHealth = useCallback(async () => {
+    setArchitectureHealthLoading(true)
+    try {
+      const report = await api<ArchitectureHealthReport>('GET', '/quality/architecture-health')
+      setArchitectureHealth(report)
+    } catch (err) {
+      setArchitectureHealth(null)
+      toast.error(err instanceof Error ? err.message : 'Unable to check architecture health')
+    } finally {
+      setArchitectureHealthLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     void loadQualityData()
   }, [loadQualityData])
+
+  useEffect(() => {
+    void loadArchitectureHealth()
+  }, [loadArchitectureHealth])
 
   useWs('runs', () => { void loadQualityData({ silent: true }) }, 5000)
 
@@ -746,7 +890,11 @@ export function QualityWorkspace() {
               {refreshing && <span className="text-[11px] text-text-3/60">Refreshing...</span>}
               <button
                 type="button"
-                onClick={() => void loadQualityData({ silent: true })}
+                onClick={() => {
+                  void loadQualityData({ silent: true })
+                  void loadArchitectureHealth()
+                  void loadReleaseReadiness()
+                }}
                 className="inline-flex items-center gap-2 rounded-[10px] border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-[12px] font-700 text-text-2 transition-colors hover:bg-white/[0.08]"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -788,6 +936,12 @@ export function QualityWorkspace() {
                 report={releaseReadiness}
                 loading={releaseReadinessLoading}
                 onRefresh={() => void loadReleaseReadiness()}
+                onOpenHref={(href) => router.push(href)}
+              />
+              <ArchitectureHealthPanel
+                report={architectureHealth}
+                loading={architectureHealthLoading}
+                onRefresh={() => void loadArchitectureHealth()}
                 onOpenHref={(href) => router.push(href)}
               />
 

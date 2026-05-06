@@ -335,6 +335,10 @@ async function runBrowserSmoke(baseUrl: string): Promise<void> {
       const text = (document.body?.innerText || '').toLowerCase()
       return text.includes('release readiness') && text.includes('ship gate report')
     }, { timeout: PAGE_TIMEOUT_MS }))
+    await smokeStep('quality architecture health panel renders', () => page.waitForFunction(() => {
+      const text = (document.body?.innerText || '').toLowerCase()
+      return text.includes('architecture health') && text.includes('runtime ownership map')
+    }, { timeout: PAGE_TIMEOUT_MS }))
     await page.close()
 
     page = await newSmokePage()

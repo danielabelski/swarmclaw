@@ -399,6 +399,15 @@ Operational docs: https://swarmclaw.ai/docs/observability
 
 ## Releases
 
+### v1.9.13 Highlights
+
+Architecture health release: SwarmClaw now turns runtime ownership, dispatch, memory, startup, and quality evidence into a scored operator report.
+
+- **Architecture Health report.** `/api/quality/architecture-health` returns a structured inventory of runtime domains, surfaces, owners, guardrails, tests, score, risks, warnings, and next actions.
+- **Quality Center visibility.** `/quality` now shows a Runtime Ownership Map beside release readiness so operators can inspect dispatch, memory, startup, and quality coverage before shipping.
+- **Release gate integration.** Release readiness includes architecture health when scoring the ship gate report, blocking or warning when ownership evidence is incomplete.
+- **CLI access.** `swarmclaw operations architecture-health` exposes the same report for automation and release scripts.
+
 ### v1.9.12 Highlights
 
 Local file-queue connector release: operators can bridge SwarmClaw to filesystem inbox, outbox, archive, and error folders without a hosted message bus.

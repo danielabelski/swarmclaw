@@ -1,4 +1,5 @@
 import type { EvalGateResult } from '@/lib/server/eval/types'
+import type { ArchitectureHealthReport } from '@/lib/quality/architecture-health'
 import type { OperationPulse, OperationPulseAction, OperationPulseRange } from '@/types'
 
 export type ReleaseReadinessStatus = 'ready' | 'warning' | 'blocked'
@@ -21,6 +22,7 @@ export interface ReleaseReadinessReport {
   warningCount: number
   pulse: OperationPulse
   evalGate: EvalGateResult | null
+  architectureHealth: ArchitectureHealthReport | null
   checks: ReleaseReadinessCheck[]
   nextActions: OperationPulseAction[]
 }
@@ -54,9 +56,11 @@ function addCheck(checks: ReleaseReadinessCheck[], check: ReleaseReadinessCheck)
 export function buildReleaseReadinessReport(input: {
   pulse: OperationPulse
   evalGate?: EvalGateResult | null
+  architectureHealth?: ArchitectureHealthReport | null
 }): ReleaseReadinessReport {
   const checks: ReleaseReadinessCheck[] = []
   const evalGate = input.evalGate ?? null
+  const architectureHealth = input.architectureHealth ?? null
 
   if (!evalGate) {
     addCheck(checks, {
@@ -169,6 +173,37 @@ export function buildReleaseReadinessReport(input: {
     })
   }
 
+  if (architectureHealth) {
+    if (architectureHealth.status === 'risk') {
+      addCheck(checks, {
+        code: 'architecture_health_risk',
+        status: 'blocked',
+        title: 'Architecture health has risks',
+        summary: `${plural(architectureHealth.riskCount, 'architecture risk')} need review before release.`,
+        href: '/quality',
+        evidence: architectureHealth.nextActions.map((action) => action.summary),
+      })
+    } else if (architectureHealth.status === 'watch') {
+      addCheck(checks, {
+        code: 'architecture_health_watch',
+        status: 'warning',
+        title: 'Architecture health needs review',
+        summary: `${plural(architectureHealth.warningCount, 'architecture warning')} found in runtime ownership checks.`,
+        href: '/quality',
+        evidence: architectureHealth.nextActions.map((action) => action.summary),
+      })
+    } else {
+      addCheck(checks, {
+        code: 'architecture_health_passed',
+        status: 'ready',
+        title: 'Architecture health passed',
+        summary: 'Dispatch, memory, startup, and quality surfaces have mapped owners, guardrails, and test evidence.',
+        href: '/quality',
+        evidence: [`${architectureHealth.score} health score`],
+      })
+    }
+  }
+
   const blockerCount = checks.filter((check) => check.status === 'blocked').length
   const warningCount = checks.filter((check) => check.status === 'warning').length
 
@@ -181,6 +216,7 @@ export function buildReleaseReadinessReport(input: {
     warningCount,
     pulse: input.pulse,
     evalGate,
+    architectureHealth,
     checks,
     nextActions: input.pulse.actions.slice(0, 8),
   }
