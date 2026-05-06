@@ -162,6 +162,8 @@ function historyActionLabel(action: ScheduleHistoryEntry['action']): string {
       return 'Skipped'
     case 'failed':
       return 'Failed'
+    case 'repaired':
+      return 'Repaired'
     default:
       return action
   }
@@ -171,6 +173,7 @@ function historyActionBadge(action: ScheduleHistoryEntry['action']): string {
   if (action === 'created' || action === 'restored' || action === 'run_started') return badgeClass('completed')
   if (action === 'failed') return badgeClass('failed')
   if (action === 'skipped' || action === 'archived') return badgeClass('paused')
+  if (action === 'repaired') return badgeClass('running')
   return badgeClass('running')
 }
 

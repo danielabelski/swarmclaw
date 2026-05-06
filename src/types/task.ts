@@ -182,6 +182,7 @@ export interface BoardTask {
   cwd?: string | null
   file?: string | null
   sessionId?: string | null
+  missionId?: string | null
   completionReportPath?: string | null
   result?: string | null
   error?: string | null

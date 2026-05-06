@@ -57,6 +57,7 @@ const HISTORY_ACTIONS = new Set<ScheduleHistoryAction>([
   'run_started',
   'skipped',
   'failed',
+  'repaired',
 ])
 
 function cleanActor(value: string): string {

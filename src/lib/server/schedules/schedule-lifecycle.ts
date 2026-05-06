@@ -1,5 +1,3 @@
-import { CronExpressionParser } from 'cron-parser'
-
 import { genId } from '@/lib/id'
 import type { BoardTask, Schedule, ScheduleStatus, Session } from '@/types'
 import { pushMainLoopEventToMainSessions } from '@/lib/server/agents/main-agent-loop'
@@ -19,6 +17,7 @@ import {
 import { notify } from '@/lib/server/ws-hub'
 import { getScheduleClusterIds } from '@/lib/server/schedules/schedule-service'
 import { appendScheduleHistoryEntry } from '@/lib/server/schedules/schedule-history'
+import { computeScheduleNextRunAt } from '@/lib/server/schedules/schedule-timing'
 
 type RestorableScheduleStatus = Exclude<ScheduleStatus, 'archived'>
 
@@ -50,33 +49,11 @@ export interface SchedulePurgeResult {
 }
 
 function computeNextRunAt(schedule: Pick<Schedule, 'scheduleType' | 'cron' | 'intervalMs' | 'runAt' | 'timezone' | 'staggerSec'>, now: number): number | undefined {
-  const applyStagger = (timestamp: number): number => {
-    if (!schedule.staggerSec || schedule.staggerSec <= 0) return timestamp
-    return timestamp + Math.floor(Math.random() * schedule.staggerSec * 1000)
+  try {
+    return computeScheduleNextRunAt(schedule, now)
+  } catch {
+    return undefined
   }
-
-  if (schedule.scheduleType === 'once') {
-    return typeof schedule.runAt === 'number' && Number.isFinite(schedule.runAt)
-      ? applyStagger(schedule.runAt)
-      : undefined
-  }
-  if (schedule.scheduleType === 'interval') {
-    return typeof schedule.intervalMs === 'number' && Number.isFinite(schedule.intervalMs)
-      ? applyStagger(now + schedule.intervalMs)
-      : undefined
-  }
-  if (schedule.scheduleType === 'cron' && typeof schedule.cron === 'string' && schedule.cron.trim()) {
-    try {
-      const interval = CronExpressionParser.parse(
-        schedule.cron,
-        schedule.timezone ? { tz: schedule.timezone } : undefined,
-      )
-      return applyStagger(interval.next().getTime())
-    } catch {
-      return undefined
-    }
-  }
-  return undefined
 }
 
 function cloneSchedule(schedule: Schedule): Schedule {

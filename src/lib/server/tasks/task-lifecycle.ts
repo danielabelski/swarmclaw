@@ -8,6 +8,9 @@ import {
   type TaskCompletionValidation,
 } from '@/lib/server/tasks/task-validation'
 import { syncTaskExecutionPolicyState } from '@/lib/server/tasks/task-execution-policy'
+import { createMission, startMission } from '@/lib/server/missions/mission-service'
+import { getMission } from '@/lib/server/missions/mission-repository'
+import { loadSessions } from '@/lib/server/storage'
 
 export interface BuildBoardTaskInput {
   id?: string
@@ -84,6 +87,7 @@ export interface PrepareScheduledTaskRunOptions {
     | 'agentId'
     | 'taskPrompt'
     | 'linkedTaskId'
+    | 'linkedMissionId'
     | 'runNumber'
     | 'createdInSessionId'
     | 'createdByAgentId'
@@ -98,20 +102,45 @@ export interface PrepareScheduledTaskRunOptions {
   scheduleSignature?: string | null
 }
 
+function ensureScheduleMission(schedule: PrepareScheduledTaskRunOptions['schedule']): string | null {
+  const existingMissionId = typeof schedule.linkedMissionId === 'string' ? schedule.linkedMissionId.trim() : ''
+  if (existingMissionId && getMission(existingMissionId)) return existingMissionId
+
+  const rootSessionId = typeof schedule.createdInSessionId === 'string' ? schedule.createdInSessionId.trim() : ''
+  if (!rootSessionId) return existingMissionId || null
+  const sessions = loadSessions()
+  if (!sessions[rootSessionId]) return existingMissionId || null
+
+  const mission = createMission({
+    title: `Scheduled task: ${schedule.name}`,
+    goal: schedule.taskPrompt || schedule.name,
+    successCriteria: ['Scheduled run is queued, executed, and reported back to the task board.'],
+    rootSessionId,
+    agentIds: [schedule.agentId].filter(Boolean),
+    reportSchedule: null,
+  })
+  startMission(mission.id)
+  schedule.linkedMissionId = mission.id
+  return mission.id
+}
+
 export function prepareScheduledTaskRun(params: PrepareScheduledTaskRunOptions): { taskId: string; task: BoardTask } {
   const { schedule, tasks, now, scheduleSignature } = params
   const title = `[Sched] ${schedule.name} (run #${schedule.runNumber})`
   const existingTaskId = typeof schedule.linkedTaskId === 'string' ? schedule.linkedTaskId : ''
   const existingTask = existingTaskId ? tasks[existingTaskId] : null
+  const missionId = ensureScheduleMission(schedule)
 
   if (existingTask && existingTask.status !== 'queued' && existingTask.status !== 'running') {
+    const task = resetTaskForRerun(existingTask, {
+      title,
+      now,
+      runNumber: schedule.runNumber,
+    })
+    task.missionId = missionId
     return {
       taskId: existingTaskId,
-      task: resetTaskForRerun(existingTask, {
-        title,
-        now,
-        runNumber: schedule.runNumber,
-      }),
+      task,
     }
   }
 
@@ -125,6 +154,7 @@ export function prepareScheduledTaskRun(params: PrepareScheduledTaskRunOptions):
       sourceScheduleId: schedule.id,
       sourceScheduleName: schedule.name,
       sourceScheduleKey: scheduleSignature || null,
+      missionId,
       createdInSessionId: schedule.createdInSessionId || null,
       createdByAgentId: schedule.createdByAgentId || null,
       followupConnectorId: schedule.followupConnectorId || null,

@@ -2,7 +2,6 @@ import { listAgents } from '@/lib/server/agents/agent-repository'
 import { loadSchedules, upsertSchedule, upsertSchedules } from '@/lib/server/schedules/schedule-repository'
 import { loadTasks, upsertTask } from '@/lib/server/tasks/task-repository'
 import { enqueueTask } from '@/lib/server/runtime/queue'
-import { CronExpressionParser } from 'cron-parser'
 import { pushMainLoopEventToMainSessions } from '@/lib/server/agents/main-agent-loop'
 import { getScheduleSignatureKey } from '@/lib/schedules/schedule-dedupe'
 import { dispatchWake } from '@/lib/server/runtime/wake-dispatcher'
@@ -14,6 +13,7 @@ import { hasActiveProtocolRunForSchedule, launchProtocolRunForSchedule } from '@
 import { hmrSingleton } from '@/lib/shared-utils'
 import { log } from '@/lib/server/logger'
 import { appendScheduleHistoryEntry } from '@/lib/server/schedules/schedule-history'
+import { assessScheduleNextRunRepair, computeScheduleNextRunAt } from '@/lib/server/schedules/schedule-timing'
 import type { Schedule } from '@/types'
 
 const TAG = 'scheduler'
@@ -52,7 +52,7 @@ export function startScheduler() {
   if (schedulerState.intervalId) return
   log.info(TAG, 'Starting scheduler engine (60s tick)')
 
-  // Compute initial nextRunAt for cron schedules missing it
+  // Compute initial timing and repair stale nextRunAt values before the first tick.
   computeNextRuns()
 
   schedulerState.intervalId = setInterval(tick, TICK_INTERVAL)
@@ -66,32 +66,64 @@ export function stopScheduler() {
   }
 }
 
-function computeNextRuns() {
+function computeNextRuns(now = Date.now()): Record<string, Schedule> {
   const schedules = loadSchedules()
   const changedEntries: Array<[string, Schedule]> = []
   for (const schedule of Object.values(schedules)) {
     if (schedule.status !== 'active') continue
-    if (schedule.scheduleType === 'cron' && schedule.cron && !schedule.nextRunAt) {
-      try {
-        const interval = CronExpressionParser.parse(
-          schedule.cron,
-          schedule.timezone ? { tz: schedule.timezone } : undefined,
-        )
-        schedule.nextRunAt = interval.next().getTime()
-        changedEntries.push([schedule.id, schedule])
-      } catch (err) {
-        log.error(TAG, `Invalid cron for ${schedule.id}:`, err)
-        schedule.status = 'failed'
-        changedEntries.push([schedule.id, schedule])
-      }
+    const assessment = assessScheduleNextRunRepair(schedule, now)
+    if (!assessment.ok) {
+      log.error(TAG, `Invalid cron for ${schedule.id}`)
+      const failedSchedule = appendScheduleHistoryEntry({
+        ...schedule,
+        status: 'failed',
+        updatedAt: now,
+      }, {
+        now,
+        actor: 'system',
+        action: 'failed',
+        summary: `Schedule failed because cron could not be parsed: "${schedule.name}"`,
+        changes: [{
+          field: 'status',
+          label: 'Status',
+          before: 'active',
+          after: 'failed',
+        }],
+        metadata: { reason: 'invalid_cron' },
+      })
+      schedules[schedule.id] = failedSchedule
+      changedEntries.push([schedule.id, failedSchedule])
+      continue
+    }
+    if (assessment.repair) {
+      const repairedSchedule = appendScheduleHistoryEntry({
+        ...schedule,
+        nextRunAt: assessment.nextRunAt,
+        updatedAt: now,
+      }, {
+        now,
+        actor: 'system',
+        action: 'repaired',
+        summary: `Schedule timing repaired: "${schedule.name}"`,
+        changes: [{
+          field: 'nextRunAt',
+          label: 'Next run',
+          before: assessment.previousNextRunAt == null ? null : String(assessment.previousNextRunAt),
+          after: String(assessment.nextRunAt),
+        }],
+        metadata: { reason: assessment.reason },
+      })
+      schedules[schedule.id] = repairedSchedule
+      changedEntries.push([schedule.id, repairedSchedule])
     }
   }
   if (changedEntries.length > 0) upsertSchedules(changedEntries)
+  return schedules
 }
 
 async function tick(now = Date.now()) {
   await processDueWatchJobs(now)
-  const schedules = loadSchedules()
+  const schedules = computeNextRuns(now)
   const agents = listAgents()
   const tasks = loadTasks()
   const inFlightScheduleKeys = new Set<string>(
@@ -101,27 +133,22 @@ async function tick(now = Date.now()) {
       .filter((value: string) => value.length > 0),
   )
 
-  const applyStagger = (ts: number, staggerSec: number | null | undefined): number => {
-    if (!staggerSec || staggerSec <= 0) return ts
-    return ts + Math.floor(Math.random() * staggerSec * 1000)
-  }
-
   const advanceSchedule = (schedule: Schedule): void => {
-    if (schedule.scheduleType === 'cron' && schedule.cron) {
-      try {
-        const interval = CronExpressionParser.parse(
-          schedule.cron,
-          schedule.timezone ? { tz: schedule.timezone } : undefined,
-        )
-        schedule.nextRunAt = applyStagger(interval.next().getTime(), schedule.staggerSec)
-      } catch {
-        schedule.status = 'failed'
-      }
-    } else if (schedule.scheduleType === 'interval' && schedule.intervalMs) {
-      schedule.nextRunAt = applyStagger(now + schedule.intervalMs, schedule.staggerSec)
-    } else if (schedule.scheduleType === 'once') {
+    if (schedule.scheduleType === 'once') {
       schedule.status = 'completed'
       schedule.nextRunAt = undefined
+      return
+    }
+
+    try {
+      const nextRunAt = computeScheduleNextRunAt(schedule, now)
+      if (nextRunAt == null) {
+        schedule.status = 'failed'
+      } else {
+        schedule.nextRunAt = nextRunAt
+      }
+    } catch {
+      schedule.status = 'failed'
     }
   }
 

@@ -118,4 +118,18 @@ describe('schedule history', () => {
     assert.equal(history[24].id, 'hist-5')
     assert.equal(schedule.revision, 30)
   })
+
+  it('retains scheduler repair history entries', () => {
+    const history = normalizeScheduleHistory([{
+      id: 'hist-repair',
+      at: 1_000,
+      actor: 'system',
+      action: 'repaired',
+      revision: 1,
+      summary: 'Schedule timing repaired',
+    }])
+
+    assert.equal(history.length, 1)
+    assert.equal(history[0].action, 'repaired')
+  })
 })

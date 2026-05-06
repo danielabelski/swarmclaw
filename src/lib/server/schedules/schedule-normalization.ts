@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { CronExpressionParser } from 'cron-parser'
 import { WORKSPACE_DIR } from '@/lib/server/data-dir'
+import { computeScheduleNextRunAt } from '@/lib/server/schedules/schedule-timing'
 
 type SchedulePayload = Record<string, unknown>
 
@@ -84,15 +84,6 @@ function parseAtTimeToCron(atTime: string): string | null {
 
   if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null
   return `${minutes} ${hours} * * *`
-}
-
-/**
- * Apply a random stagger offset (in seconds) to a timestamp.
- */
-function applyStagger(timestamp: number, staggerSec: number | null | undefined): number {
-  if (!staggerSec || staggerSec <= 0) return timestamp
-  const offset = Math.floor(Math.random() * staggerSec * 1000)
-  return timestamp + offset
 }
 
 function normalizePositiveInt(value: unknown): number | null {
@@ -326,24 +317,11 @@ export function normalizeSchedulePayload(payload: SchedulePayload, opts: Normali
   }
 
   if (normalized.status !== 'archived' && normalized.nextRunAt == null) {
-    if (normalized.scheduleType === 'once') {
-      if (runAt != null) normalized.nextRunAt = applyStagger(runAt, normalized.staggerSec as number | null)
-    } else if (normalized.scheduleType === 'interval') {
-      if (intervalMs != null) normalized.nextRunAt = applyStagger(now + intervalMs, normalized.staggerSec as number | null)
-    } else if (normalized.scheduleType === 'cron' && normalized.cron) {
-      try {
-        const cronTimezone = trimString(normalized.timezone)
-        const interval = CronExpressionParser.parse(
-          normalized.cron as string,
-          {
-            ...(cronTimezone ? { tz: cronTimezone } : {}),
-            currentDate: new Date(now),
-          },
-        )
-        normalized.nextRunAt = applyStagger(interval.next().getTime(), normalized.staggerSec as number | null)
-      } catch {
-        return { ok: false, error: 'Error: invalid cron expression.' }
-      }
+    try {
+      const computedNextRunAt = computeScheduleNextRunAt(normalized, now)
+      if (computedNextRunAt != null) normalized.nextRunAt = computedNextRunAt
+    } catch {
+      return { ok: false, error: 'Error: invalid cron expression.' }
     }
   }
 

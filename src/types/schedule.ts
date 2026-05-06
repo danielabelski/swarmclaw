@@ -3,7 +3,7 @@ import type { ExtensionManagedResourceMarker } from './extension'
 export type ScheduleType = 'cron' | 'interval' | 'once'
 export type ScheduleStatus = 'active' | 'paused' | 'completed' | 'failed' | 'archived'
 export type ScheduleTaskMode = 'task' | 'wake_only' | 'protocol'
-export type ScheduleHistoryAction = 'created' | 'updated' | 'archived' | 'restored' | 'run_started' | 'skipped' | 'failed'
+export type ScheduleHistoryAction = 'created' | 'updated' | 'archived' | 'restored' | 'run_started' | 'skipped' | 'failed' | 'repaired'
 
 export interface ScheduleHistoryChange {
   field: string
@@ -55,7 +55,7 @@ export interface Schedule {
   nextRunAt?: number
   /** IANA timezone for schedule evaluation (default: system local) */
   timezone?: string | null
-  /** Random stagger window in seconds added to nextRunAt to avoid thundering herd */
+  /** Deterministic stagger window in seconds added to nextRunAt to avoid thundering herd */
   staggerSec?: number | null
   /** Last delivery status for this schedule */
   lastDeliveryStatus?: 'ok' | 'error' | null

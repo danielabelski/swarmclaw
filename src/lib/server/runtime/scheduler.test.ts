@@ -202,6 +202,135 @@ describe('scheduler wake targeting', () => {
     assert.deepEqual(output.deliveryModes, ['silent'])
   })
 
+  it('repairs stale future cron next-run slots without launching a run', () => {
+    const output = runSchedulerWithTempDataDir(`
+      const storageMod = await import('@/lib/server/storage')
+      const schedulerMod = await import('@/lib/server/runtime/scheduler')
+      const storage = storageMod.default || storageMod
+      const scheduler = schedulerMod.default || schedulerMod
+
+      const now = Date.parse('2026-05-06T07:30:00.000Z')
+      const staleFuture = Date.parse('2026-05-12T08:00:00.000Z')
+
+      storage.saveSchedules({
+        'sched-cron': {
+          id: 'sched-cron',
+          name: 'Daily status',
+          agentId: 'agent-1',
+          taskPrompt: 'Send the daily status.',
+          scheduleType: 'cron',
+          cron: '0 8 * * *',
+          timezone: 'UTC',
+          status: 'active',
+          nextRunAt: staleFuture,
+          createdAt: now - 10_000,
+          updatedAt: now - 10_000,
+        },
+      })
+
+      await scheduler.runSchedulerTickForTests(now)
+      const schedule = storage.loadSchedules()['sched-cron']
+
+      console.log(JSON.stringify({
+        status: schedule.status,
+        nextRunAt: schedule.nextRunAt,
+        taskCount: Object.keys(storage.loadTasks()).length,
+        historyAction: schedule.history?.[0]?.action || null,
+        historyReason: schedule.history?.[0]?.metadata?.reason || null,
+      }))
+    `)
+
+    assert.equal(output.status, 'active')
+    assert.equal(output.nextRunAt, Date.parse('2026-05-06T08:00:00.000Z'))
+    assert.equal(output.taskCount, 0)
+    assert.equal(output.historyAction, 'repaired')
+    assert.equal(output.historyReason, 'stale_future')
+  })
+
+  it('advances cron schedules from the scheduler tick time after firing', () => {
+    const output = runSchedulerWithTempDataDir(`
+      const storageMod = await import('@/lib/server/storage')
+      const schedulerMod = await import('@/lib/server/runtime/scheduler')
+      const heartbeatWakeMod = await import('@/lib/server/runtime/heartbeat-wake')
+      const storage = storageMod.default || storageMod
+      const scheduler = schedulerMod.default || schedulerMod
+      const heartbeatWake = heartbeatWakeMod.default || heartbeatWakeMod
+
+      const now = Date.parse('2030-01-01T08:00:30.000Z')
+      const dueAt = Date.parse('2030-01-01T08:00:00.000Z')
+
+      storage.saveAgents({
+        'agent-1': {
+          id: 'agent-1',
+          name: 'Daily Agent',
+          description: '',
+          systemPrompt: '',
+          provider: 'openai',
+          model: 'gpt-test',
+          threadSessionId: 'thread-main',
+          createdAt: now - 10_000,
+          updatedAt: now - 10_000,
+        },
+      })
+
+      storage.saveSessions({
+        'thread-main': {
+          id: 'thread-main',
+          name: 'Daily Agent',
+          cwd: process.env.WORKSPACE_DIR,
+          user: 'tester',
+          provider: 'openai',
+          model: 'gpt-test',
+          claudeSessionId: null,
+          messages: [],
+          createdAt: now - 10_000,
+          lastActiveAt: now - 5_000,
+          active: true,
+          currentRunId: null,
+          agentId: 'agent-1',
+          shortcutForAgentId: 'agent-1',
+        },
+      })
+
+      storage.saveSchedules({
+        'sched-cron': {
+          id: 'sched-cron',
+          name: 'Daily wake',
+          agentId: 'agent-1',
+          taskPrompt: 'Wake for the daily status.',
+          taskMode: 'wake_only',
+          message: 'Run the daily status.',
+          scheduleType: 'cron',
+          cron: '0 8 * * *',
+          timezone: 'UTC',
+          status: 'active',
+          nextRunAt: dueAt,
+          createdInSessionId: 'thread-main',
+          createdAt: now - 10_000,
+          updatedAt: now - 10_000,
+        },
+      })
+
+      await scheduler.runSchedulerTickForTests(now)
+      const schedule = storage.loadSchedules()['sched-cron']
+      const wakes = heartbeatWake.snapshotPendingHeartbeatWakesForTests()
+
+      console.log(JSON.stringify({
+        status: schedule.status,
+        nextRunAt: schedule.nextRunAt,
+        runNumber: schedule.runNumber,
+        historyAction: schedule.history?.[0]?.action || null,
+        wakeCount: wakes.length,
+      }))
+    `)
+
+    assert.equal(output.status, 'active')
+    assert.equal(output.nextRunAt, Date.parse('2030-01-02T08:00:00.000Z'))
+    assert.equal(output.runNumber, 1)
+    assert.equal(output.historyAction, 'run_started')
+    assert.equal(output.wakeCount, 1)
+  })
+
   it('reuses a persistent mission for scheduled task runs', () => {
     const output = runSchedulerWithTempDataDir(`
       const storageMod = await import('@/lib/server/storage')

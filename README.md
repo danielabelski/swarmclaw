@@ -151,13 +151,13 @@ clawhub install swarmclaw
 
 [Browse on ClawHub](https://clawhub.ai/skills/swarmclaw)
 
-## v1.9.17 Highlights
+## v1.9.23 Highlights
 
-Agent configuration history is now visible in the agent editor, so operators can review recent saved versions and restore prior settings without leaving the agent workflow.
+Schedule reliability is now more deterministic for recurring autonomous work, especially after restarts or stale stored timing state.
 
-- **Agent sheet history.** Advanced agent settings list recent saved versions with timestamp, actor, and provider/model snapshot.
-- **One-click restore.** Restoring a prior version uses the existing config-version restore API, refreshes agent state, and closes the sheet to avoid stale form data.
-- **Regression coverage.** New tests cover config-version list/restore routes and UI summary formatting.
+- **Cron drift repair.** Active schedules repair stale future cron slots before they skip the nearest run.
+- **Stable stagger.** Staggered schedules keep a deterministic per-schedule offset.
+- **Mission continuity.** Schedule-created board tasks keep a persistent mission link across recurring runs.
 
 ## Hosted Deploys
 
@@ -408,6 +408,15 @@ If you need a trace-specific endpoint, set `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` 
 Operational docs: https://swarmclaw.ai/docs/observability
 
 ## Releases
+
+### v1.9.23 Highlights
+
+Schedule reliability release: recurring work now repairs stale timing state before it can skip the nearest run, and scheduled board tasks keep mission context across repeat launches.
+
+- **Cron drift repair.** Active cron schedules repair missing or invalid `nextRunAt` values and stale future cron slots before the scheduler decides whether work is due.
+- **Tick-time advancement.** Cron and interval schedules now advance from the scheduler tick time instead of the process wall clock, making restart and catch-up behavior deterministic.
+- **Stable stagger.** Schedule stagger offsets are deterministic per schedule, avoiding thundering-herd launches without moving a saved next-run target on every recompute.
+- **Mission continuity.** Schedule-created board tasks attach to a persistent mission link, so recurring runs share the same operational context.
 
 ### v1.9.22 Highlights
 
