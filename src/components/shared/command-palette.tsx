@@ -92,7 +92,7 @@ function CommandPaletteInner({ setOpen }: { setOpen: (v: boolean) => void }) {
       { id: 'projects', label: 'Projects', description: 'Scoped workspaces for agents and tasks', keywords: ['workspace', 'scope'] },
       { id: 'chatrooms', label: 'Chatrooms', description: 'Shared multi-agent conversations', keywords: ['group', 'room', 'mentions'] },
       { id: 'schedules', label: 'Schedules', description: 'Recurring and timed automations', keywords: ['cron', 'automation', 'interval'] },
-      { id: 'connectors', label: 'Connectors', description: 'Bridges to Slack, Discord, Telegram, and more', keywords: ['discord', 'slack', 'telegram', 'whatsapp'] },
+      { id: 'connectors', label: 'Connectors', description: 'Bridges to Slack, Discord, Telegram, file queues, and more', keywords: ['discord', 'slack', 'telegram', 'whatsapp', 'file queue'] },
       { id: 'memory', label: 'Memory', description: 'Stored agent memory and retrieval', keywords: ['knowledge', 'vector', 'retrieval'] },
       { id: 'knowledge', label: 'Knowledge', description: 'Shared knowledge base', keywords: ['docs', 'entries', 'facts'] },
       { id: 'providers', label: 'Providers', description: 'Model providers and endpoints', keywords: ['openai', 'anthropic', 'ollama', 'endpoint'] },

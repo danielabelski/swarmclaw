@@ -14,6 +14,7 @@ describe('connectorSupportsBinaryMedia — email', () => {
   it('still returns false for platforms that do not support outbound binary', () => {
     assert.equal(connectorSupportsBinaryMedia('signal'), false)
     assert.equal(connectorSupportsBinaryMedia('matrix'), false)
+    assert.equal(connectorSupportsBinaryMedia('filequeue'), false)
   })
 })
 

@@ -4,7 +4,7 @@ export type ConnectorReadinessState = 'needs_setup' | 'attention' | 'healthy'
 export type ConnectorReadinessCheckStatus = 'ready' | 'warning' | 'error'
 
 export interface ConnectorReadinessCheck {
-  id: 'credentials' | 'route' | 'pairing' | 'connection' | 'gateway'
+  id: 'credentials' | 'route' | 'pairing' | 'connection' | 'gateway' | 'queue'
   label: string
   status: ConnectorReadinessCheckStatus
   detail: string
@@ -26,6 +26,7 @@ export function hasConnectorCredentials(connector: Connector): boolean {
     || connector.platform === 'openclaw'
     || connector.platform === 'signal'
     || connector.platform === 'email'
+    || connector.platform === 'filequeue'
     || connector.platform === 'swarmdock'
     || (connector.platform === 'bluebubbles' && (!!connector.credentialId || !!connector.config?.password))
     || !!connector.credentialId
@@ -53,12 +54,21 @@ export function getConnectorReadiness(connector: Connector): ConnectorReadiness 
   const credentialsReady = hasConnectorCredentials(connector)
   const routeReady = hasRoute(connector)
   const checks: ConnectorReadinessCheck[] = [
-    {
-      id: 'credentials',
-      label: 'Credentials',
-      status: credentialsReady ? 'ready' : 'error',
-      detail: credentialsReady ? 'Credential path is configured.' : 'Add the token, password, or pairing credential.',
-    },
+    connector.platform === 'filequeue'
+      ? {
+          id: 'queue',
+          label: 'Queue folders',
+          status: 'ready',
+          detail: connector.config?.rootDir
+            ? `Watching ${connector.config.rootDir}`
+            : 'Using the managed local queue folder.',
+        }
+      : {
+          id: 'credentials',
+          label: 'Credentials',
+          status: credentialsReady ? 'ready' : 'error',
+          detail: credentialsReady ? 'Credential path is configured.' : 'Add the token, password, or pairing credential.',
+        },
     {
       id: 'route',
       label: 'Route target',

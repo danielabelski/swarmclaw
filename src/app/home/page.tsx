@@ -429,7 +429,7 @@ export default function HomePage() {
             <StatCard label="Agents" value={String(agentCount)} hint="Total active agents configured in your dashboard" index={0} />
             <StatCard label="Active Tasks" value={String(activeTaskCount)} accent={activeTaskCount > 0} hint="Tasks currently running or queued for execution" index={1} />
             <StatCard label="Today's Cost" value={`$${todayCost.toFixed(2)}`} hint="Estimated API cost for today across all providers" index={2} />
-            <StatCard label="Connectors" value={`${activeConnectorCount}/${allConnectors.length}`} accent={activeConnectorCount > 0} hint="Active bridges to chat platforms (Discord, Slack, etc.)" index={3} />
+            <StatCard label="Connectors" value={`${activeConnectorCount}/${allConnectors.length}`} accent={activeConnectorCount > 0} hint="Active bridges to chat platforms, local queues, and agent channels." index={3} />
           </div>
 
           {/* Cost trend sparkline */}

@@ -86,6 +86,12 @@ interface ConnectorConfigField {
 }
 
 const FIELD_HINTS: Record<string, string> = {
+  rootDir: 'Root folder for the queue. Defaults to a managed folder under SwarmClaw data.',
+  inboxDir: 'Folder where external tools drop inbound JSON commands. Relative paths are resolved under Root Directory.',
+  outboxDir: 'Folder where SwarmClaw writes outbound JSON replies. Relative paths are resolved under Root Directory.',
+  archiveDir: 'Processed inbound JSON commands are moved here after routing.',
+  errorDir: 'Malformed or failed inbound JSON commands are moved here with an error sidecar.',
+  pollIntervalMs: 'How often SwarmClaw checks the inbox folder. Minimum 250 ms.',
   channelIds: "Find these in your platform's developer settings. Leave empty to allow all channels",
   chatIds: "Find these in your platform's developer settings. Leave empty to allow all chats",
   roomIds: 'Leave empty to allow all rooms visible to the bot',
@@ -364,6 +370,30 @@ const PLATFORMS: {
       { key: 'skills', label: 'Skills (comma-separated)', placeholder: 'data-analysis,web-design', help: 'Skill IDs for task matching' },
       { key: 'autoDiscover', label: 'Auto-Discover Tasks', placeholder: 'false', help: 'Automatically bid on matching tasks' },
       { key: 'maxBudget', label: 'Max Budget (USDC micro-units)', placeholder: '5000000', help: '$1 = 1000000, $5 = 5000000' },
+    ],
+  },
+  {
+    id: 'filequeue',
+    label: 'File Queue',
+    color: '#22C55E',
+    setupSteps: [
+      'Choose a root directory or let SwarmClaw create a managed one',
+      'External tools write JSON commands into the inbox folder',
+      'SwarmClaw archives processed commands and writes JSON replies into the outbox folder',
+      'Use an agent or chatroom route to decide who handles inbound commands',
+    ],
+    tokenLabel: '',
+    tokenHelp: '',
+    configFields: [
+      { key: 'rootDir', label: 'Root Directory', placeholder: '~/swarmclaw-command-queue', help: 'Optional. Defaults to data/connectors/<id>/filequeue.', section: 'basic' },
+      { key: 'inboxDir', label: 'Inbox Directory', placeholder: 'inbox', help: 'Inbound JSON command directory. Relative paths resolve under Root Directory.', section: 'basic' },
+      { key: 'outboxDir', label: 'Outbox Directory', placeholder: 'outbox', help: 'Outbound JSON reply directory. Relative paths resolve under Root Directory.', section: 'basic' },
+      { key: 'archiveDir', label: 'Archive Directory', placeholder: 'archive', help: 'Processed command archive directory.', section: 'advanced' },
+      { key: 'errorDir', label: 'Error Directory', placeholder: 'errors', help: 'Malformed command quarantine directory.', section: 'advanced' },
+      { key: 'pollIntervalMs', label: 'Poll Interval (ms)', placeholder: '1000', help: 'How often to scan the inbox. Minimum 250 ms.', section: 'advanced' },
+      { key: 'defaultChannelId', label: 'Default Channel ID', placeholder: 'ops', help: 'Used when an inbound command omits channelId.', section: 'advanced' },
+      { key: 'defaultSenderId', label: 'Default Sender ID', placeholder: 'queue', help: 'Used when an inbound command omits senderId.', section: 'advanced' },
+      { key: 'defaultSenderName', label: 'Default Sender Name', placeholder: 'Queue', help: 'Used when an inbound command omits senderName.', section: 'advanced' },
     ],
   },
 ]
@@ -780,10 +810,10 @@ export function ConnectorSheet() {
       await saveConnectorMutation.mutateAsync({
         id: editing?.id,
         payload: {
-          name: name || `${platformConfig?.label} Bot`,
+          name: name || (platform === 'filequeue' ? `${platformConfig?.label} Connector` : `${platformConfig?.label} Bot`),
           platform,
           ...routePayload,
-          credentialId: credentialId || null,
+          credentialId: showCredentialSection ? (credentialId || null) : null,
           config,
         },
       })
@@ -848,6 +878,7 @@ export function ConnectorSheet() {
   const credList = Object.values(credentials)
   const basicPlatformFields = platformConfig.configFields.filter((field) => field.section !== 'advanced')
   const advancedPlatformFields = platformConfig.configFields.filter((field) => field.section === 'advanced')
+  const showCredentialSection = Boolean(platformConfig.tokenLabel.trim())
   const basicAccessFields = ACCESS_CONTROL_FIELDS.filter((field) => field.section !== 'advanced')
   const advancedAccessFields = ACCESS_CONTROL_FIELDS.filter((field) => field.section === 'advanced')
   const hasConfiguredValue = useCallback((key: string) => Boolean(config[key]?.trim()), [config])
@@ -1014,7 +1045,7 @@ export function ConnectorSheet() {
                 <div>
                   <div className={`text-[14px] font-600 ${platform === p.id ? 'text-text' : 'text-text-2'}`}>{p.label}</div>
                   <div className="text-[11px] text-text-3 mt-0.5">
-                    {p.id === 'whatsapp' ? 'QR code pairing' : p.id === 'openclaw' ? 'WebSocket gateway' : p.id === 'bluebubbles' ? 'iMessage bridge' : p.id === 'signal' ? 'signal-cli binary' : p.id === 'matrix' ? 'Access token' : p.id === 'googlechat' ? 'Service account' : p.id === 'teams' ? 'Bot Framework' : 'Bot token'}
+                    {p.id === 'whatsapp' ? 'QR code pairing' : p.id === 'openclaw' ? 'WebSocket gateway' : p.id === 'bluebubbles' ? 'iMessage bridge' : p.id === 'signal' ? 'signal-cli binary' : p.id === 'matrix' ? 'Access token' : p.id === 'googlechat' ? 'Service account' : p.id === 'teams' ? 'Bot Framework' : p.id === 'filequeue' ? 'Local queue' : 'Bot token'}
                   </div>
                 </div>
               </button>
@@ -1074,7 +1105,7 @@ export function ConnectorSheet() {
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder={`My ${platformConfig.label} Bot`}
+          placeholder={`My ${platformConfig.label} ${platform === 'filequeue' ? 'Connector' : 'Bot'}`}
           className={inputClass}
           style={{ fontFamily: 'inherit' }}
         />
@@ -1128,7 +1159,7 @@ export function ConnectorSheet() {
       </div>
 
       {/* Bot token credential */}
-      {platform !== 'whatsapp' && (
+      {showCredentialSection && (
         <div className="mb-6">
           <label className="block font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">{platformConfig.tokenLabel}</label>
           <p className="text-[12px] text-text-3/60 mb-2">{platformConfig.tokenHelp}</p>

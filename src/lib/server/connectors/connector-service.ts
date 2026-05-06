@@ -192,6 +192,7 @@ export async function autoStartConnectorIfNeeded(connector: Connector, body: Rec
   const hasCredentials = connector.platform === 'whatsapp'
     || connector.platform === 'openclaw'
     || (connector.platform === 'bluebubbles' && (!!connector.credentialId || !!connector.config.password))
+    || connector.platform === 'filequeue'
     || !!connector.credentialId
   if (!hasCredentials || body.autoStart === false) return
   try {

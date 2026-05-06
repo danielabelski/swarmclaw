@@ -8,6 +8,10 @@ import {
 
 describe('connector platform metadata', () => {
   it('resolves legacy connector platforms used by stored runtime data', () => {
+    assert.deepEqual(resolveConnectorPlatformMeta('filequeue'), {
+      label: 'File Queue',
+      color: '#22C55E',
+    })
     assert.deepEqual(resolveConnectorPlatformMeta('webchat'), {
       label: 'Web Chat',
       color: '#0EA5E9',

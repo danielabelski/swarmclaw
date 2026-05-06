@@ -161,7 +161,7 @@ export const ConnectorCreateSchema = z.object({
   name: z.string().min(1, 'Connector name is required').optional(),
   platform: z.enum([
     'discord', 'telegram', 'slack', 'whatsapp', 'openclaw',
-    'bluebubbles', 'signal', 'teams', 'googlechat', 'matrix', 'email', 'swarmdock',
+    'bluebubbles', 'signal', 'teams', 'googlechat', 'matrix', 'email', 'filequeue', 'swarmdock',
   ]),
   agentId: z.string().nullable().optional().default(null),
   chatroomId: z.string().nullable().optional().default(null),

@@ -183,7 +183,7 @@ Full hosted deployment guides live at https://swarmclaw.ai/docs/deployment
 - **Structured Sessions**: reusable bounded runs with templates, facilitators, participants, hidden live rooms, chatroom `/breakout`, durable transcripts, outputs, operator controls, and a visible protocols template gallery plus visual builder.
 - **Memory**: hybrid recall, graph traversal, journaling, durable documents, project-scoped context, automatic reflection memory, communication preferences, profile and boundary memory, significant events, and open follow-up loops.
 - **Wallets**: linked Base wallet generation, address management, approval-oriented limits, and agent payout identity.
-- **Connectors**: Discord, Slack, Telegram, WhatsApp, Teams, Matrix, OpenClaw, SwarmDock, SwarmFeed, and more.
+- **Connectors**: Discord, Slack, Telegram, WhatsApp, Teams, Matrix, email, local file queues, OpenClaw, SwarmDock, SwarmFeed, and more.
 - **MCP Servers**: connect any Model Context Protocol server (stdio, SSE, or streamable HTTP) and inject its tools into agents alongside built-ins. Configure, test, and assign per-agent from the MCP Servers panel.
 - **Extensions**: external tool extensions, UI modules, hooks, install/update flows, and managed resource manifests for extension-owned agents, routines, local folders, gateways, and setup checks.
 
@@ -398,6 +398,15 @@ If you need a trace-specific endpoint, set `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` 
 Operational docs: https://swarmclaw.ai/docs/observability
 
 ## Releases
+
+### v1.9.12 Highlights
+
+Local file-queue connector release: operators can bridge SwarmClaw to filesystem inbox, outbox, archive, and error folders without a hosted message bus.
+
+- **File Queue connector.** Configure root, inbox, outbox, archive, and error folders from the connector sheet or CLI.
+- **JSON command ingress.** External tools can drop command envelopes into the inbox, then SwarmClaw normalizes them into connector messages for the selected agent or chatroom.
+- **Durable file handling.** Processed commands move to archive, malformed commands move to errors with diagnostic sidecars, and replies are written to outbox as structured JSON.
+- **Connector runtime parity.** Queue traffic uses the existing connector session, policy, health, readiness, CLI, and follow-up delivery paths.
 
 ### v1.9.11 Highlights
 

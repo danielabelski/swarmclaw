@@ -210,6 +210,7 @@ const VALID_CONNECTOR_PLATFORMS = new Set([
   'googlechat',
   'matrix',
   'email',
+  'filequeue',
   'webchat',
   'mockmail',
 ])

@@ -71,6 +71,7 @@ export async function getPlatform(platform: string) {
     case 'googlechat': return (await import('./googlechat')).default
     case 'matrix':    return (await import('./matrix')).default
     case 'email':     return (await import('./email')).default
+    case 'filequeue': return (await import('./filequeue')).default
     case 'swarmdock': return (await import('./swarmdock')).default
   }
 
@@ -181,7 +182,7 @@ async function _startConnectorImpl(connectorId: string): Promise<void> {
       botToken = swarmdockFallbackPrivateKey
     }
 
-    if (!botToken && connector.platform !== 'whatsapp' && connector.platform !== 'openclaw' && connector.platform !== 'signal' && connector.platform !== 'email' && connector.platform !== 'swarmdock') {
+    if (!botToken && connector.platform !== 'whatsapp' && connector.platform !== 'openclaw' && connector.platform !== 'signal' && connector.platform !== 'email' && connector.platform !== 'filequeue' && connector.platform !== 'swarmdock') {
       throw new Error('No bot token configured')
     }
 

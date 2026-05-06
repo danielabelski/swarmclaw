@@ -698,7 +698,7 @@ if (!IS_BUILD_BOOTSTRAP) {
 - **Tasks** — The Task Board tracks work items. Assign agents and they'll execute autonomously.
 - **Schedules** — Cron-based recurring jobs that run agents or tasks automatically.
 - **Skills** — Reusable markdown instruction files agents can discover and use by default; pin them to keep favorite workflows always-on.
-- **Connectors** — Bridge agents to Discord, Slack, Telegram, or WhatsApp.
+- **Connectors** — Bridge agents to chat platforms, local file queues, and agent channels.
 - **Secrets** — Encrypted vault for API keys (Settings → Secrets).
 
 ## Tools
