@@ -278,6 +278,23 @@ const COMMAND_GROUPS = [
       cmd('create', 'POST', '/gateways', 'Create a gateway profile', { expectsJsonBody: true }),
       cmd('update', 'PUT', '/gateways/:id', 'Update a gateway profile', { expectsJsonBody: true }),
       cmd('delete', 'DELETE', '/gateways/:id', 'Delete a gateway profile'),
+      cmd('control', 'POST', '/gateways/:id/control', 'Run a gateway lifecycle control action', { expectsJsonBody: true }),
+      cmd('activate', 'POST', '/gateways/:id/control', 'Return a gateway to active routing', {
+        expectsJsonBody: true,
+        defaultBody: { action: 'activate' },
+      }),
+      cmd('drain', 'POST', '/gateways/:id/control', 'Drain a gateway from new automatic work', {
+        expectsJsonBody: true,
+        defaultBody: { action: 'drain' },
+      }),
+      cmd('cordon', 'POST', '/gateways/:id/control', 'Cordon a gateway from automatic work', {
+        expectsJsonBody: true,
+        defaultBody: { action: 'cordon' },
+      }),
+      cmd('restart', 'POST', '/gateways/:id/control', 'Request a gateway restart', {
+        expectsJsonBody: true,
+        defaultBody: { action: 'restart' },
+      }),
       cmd('health', 'GET', '/gateways/:id/health', 'Run a gateway health check'),
       cmd('topology', 'GET', '/gateways/:id/topology', 'Refresh and return one gateway topology snapshot'),
       cmd('environments', 'GET', '/gateways/:id/environments', 'List OpenClaw gateway execution environments'),

@@ -225,6 +225,36 @@ test('tasks execution-policy-decision posts policy decisions', async () => {
   assert.equal(stderr.toString(), '')
 })
 
+test('gateways drain command posts a lifecycle control action', async () => {
+  const stdout = makeWritable()
+  const stderr = makeWritable()
+  const calls = []
+
+  const fetchImpl = async (url, init) => {
+    calls.push({ url: String(url), init })
+    return jsonResponse({ ok: true })
+  }
+
+  const exitCode = await runCli(
+    ['gateways', 'drain', 'gateway-1', '--json'],
+    {
+      fetchImpl,
+      stdout,
+      stderr,
+      env: {
+        SWARMCLAW_API_KEY: 'test-key',
+      },
+      cwd: process.cwd(),
+    }
+  )
+
+  assert.equal(exitCode, 0)
+  assert.equal(calls.length, 1)
+  assert.match(calls[0].url, /\/api\/gateways\/gateway-1\/control$/)
+  assert.equal(calls[0].init.method, 'POST')
+  assert.deepEqual(JSON.parse(calls[0].init.body), { action: 'drain' })
+})
+
 test('openclaw deploy bundle command merges action with provided JSON body', async () => {
   const stdout = makeWritable()
   const stderr = makeWritable()

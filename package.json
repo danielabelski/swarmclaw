@@ -1,6 +1,6 @@
 {
   "name": "@swarmclawai/swarmclaw",
-  "version": "1.9.24",
+  "version": "1.9.25",
   "description": "Build and run autonomous AI agents with OpenClaw, Hermes, multiple model providers, orchestration, delegation, memory, skills, schedules, and chat connectors.",
   "main": "electron-dist/main.js",
   "license": "MIT",
@@ -39,7 +39,7 @@
     "node": ">=22.6.0"
   },
   "bin": {
-    "swarmclaw": "./bin/swarmclaw.js"
+    "swarmclaw": "bin/swarmclaw.js"
   },
   "files": [
     "bin/",

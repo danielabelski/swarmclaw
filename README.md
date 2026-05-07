@@ -151,12 +151,13 @@ clawhub install swarmclaw
 
 [Browse on ClawHub](https://clawhub.ai/skills/swarmclaw)
 
-## v1.9.24 Highlights
+## v1.9.25 Highlights
 
 Gateway lifecycle controls and Slack peer-agent collaboration are now safer for multi-agent operations.
 
 - **Gateway lifecycle controls.** Providers can activate, drain, cordon, or request restart for saved OpenClaw gateways.
 - **Routing guardrails.** New OpenClaw work skips draining or cordoned gateway profiles, and Operations Pulse flags unavailable gateways.
+- **CLI lifecycle access.** `swarmclaw gateways activate`, `drain`, `cordon`, and `restart` now reach the same lifecycle control endpoint as the provider UI.
 - **Slack peer messages.** Peer bot messages now reach the existing connector policy gates while self-loop messages are still blocked.
 
 ## Hosted Deploys
@@ -409,13 +410,14 @@ Operational docs: https://swarmclaw.ai/docs/observability
 
 ## Releases
 
-### v1.9.24 Highlights
+### v1.9.25 Highlights
 
 Gateway lifecycle release: saved OpenClaw gateways now have explicit operator lifecycle controls, automatic routing avoids gateways that should not receive new work, and Slack peer-agent messages flow through the existing connector policy gates.
 
 - **Gateway lifecycle controls.** Providers can activate, drain, cordon, and request restart for saved OpenClaw gateway profiles.
 - **Routing guardrails.** OpenClaw route selection skips draining and cordoned profiles, including default, preferred, and pinned gateway paths.
 - **Operations Pulse awareness.** Cordoned and draining gateways now appear as operator attention items before they surprise a handoff or release check.
+- **CLI lifecycle access.** `swarmclaw gateways activate`, `drain`, `cordon`, and `restart` now post the matching lifecycle action for automation and release scripts.
 - **Slack peer collaboration.** Slack peer-bot messages are no longer dropped before group policy, mention, and self-loop protections run.
 
 ### v1.9.23 Highlights
