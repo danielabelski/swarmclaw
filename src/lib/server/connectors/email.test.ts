@@ -81,7 +81,10 @@ describe('email TLS configuration', () => {
     assert.equal(parseTlsRejectUnauthorized(false), false)
     assert.equal(parseTlsRejectUnauthorized('false'), false)
     assert.equal(parseTlsRejectUnauthorized('0'), false)
-    assert.deepEqual(buildEmailTlsOptions({ tlsRejectUnauthorized: false }), { rejectUnauthorized: false })
+    const tls = buildEmailTlsOptions({ tlsRejectUnauthorized: false })
+    assert.equal(tls.rejectUnauthorized, false)
+    assert.equal(typeof tls.checkServerIdentity, 'function')
+    assert.equal(tls.checkServerIdentity?.('localhost', {} as never), undefined)
   })
 
   it('handles IMAP socket errors without leaving the emitter unhandled', () => {

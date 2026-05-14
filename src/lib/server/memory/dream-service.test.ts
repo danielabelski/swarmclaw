@@ -1,6 +1,28 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
+import { resolveDreamGenerationPreference } from './dream-generation-preference'
 import { parseTier2DreamResponseText } from './dream-service'
+
+describe('resolveDreamGenerationPreference', () => {
+  it('returns no preference when no dream provider is configured', () => {
+    assert.equal(resolveDreamGenerationPreference({}), undefined)
+    assert.equal(resolveDreamGenerationPreference({ dreamProvider: '   ' }), undefined)
+  })
+
+  it('builds a trimmed dream model preference from app settings', () => {
+    assert.deepEqual(resolveDreamGenerationPreference({
+      dreamProvider: ' ollama ',
+      dreamModel: ' gemma4:e4b ',
+      dreamCredentialId: ' cred-1 ',
+      dreamEndpoint: ' http://localhost:11434 ',
+    }), {
+      provider: 'ollama',
+      model: 'gemma4:e4b',
+      credentialId: 'cred-1',
+      apiEndpoint: 'http://localhost:11434',
+    })
+  })
+})
 
 describe('parseTier2DreamResponseText', () => {
   it('parses a plain structured dream response', () => {

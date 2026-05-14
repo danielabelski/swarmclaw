@@ -27,6 +27,11 @@ export interface AppSettings {
   embeddingModel?: string | null
   embeddingCredentialId?: string | null
   embeddingEndpoint?: string | null
+  // Optional model override for memory consolidation and dream cycles.
+  dreamProvider?: string | null
+  dreamModel?: string | null
+  dreamCredentialId?: string | null
+  dreamEndpoint?: string | null
   loopMode?: LoopMode
   agentLoopRecursionLimit?: number
   delegationMaxDepth?: number

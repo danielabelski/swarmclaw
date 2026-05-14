@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import type { ConnectionOptions } from 'node:tls'
 import { ImapFlow } from 'imapflow'
 import { createTransport, type Transporter } from 'nodemailer'
 import { simpleParser } from 'mailparser'
@@ -34,6 +35,10 @@ interface ImapErrorEmitter {
   on(event: 'error', listener: (err: unknown) => void): unknown
 }
 
+type EmailTlsOptions = Pick<ConnectionOptions, 'rejectUnauthorized' | 'checkServerIdentity'> & {
+  rejectUnauthorized: boolean
+}
+
 export function buildAttachments(options?: OutboundSendOptions): MailAttachment[] {
   const source = options?.mediaPath
   if (!source) return []
@@ -59,8 +64,11 @@ export function parseTlsRejectUnauthorized(value: unknown): boolean {
   return true
 }
 
-export function buildEmailTlsOptions(config: Pick<EmailConfig, 'tlsRejectUnauthorized'>): { rejectUnauthorized: boolean } {
-  return { rejectUnauthorized: config.tlsRejectUnauthorized !== false }
+export function buildEmailTlsOptions(config: Pick<EmailConfig, 'tlsRejectUnauthorized'>): EmailTlsOptions {
+  const reject = config.tlsRejectUnauthorized !== false
+  return reject
+    ? { rejectUnauthorized: true }
+    : { rejectUnauthorized: false, checkServerIdentity: () => undefined }
 }
 
 export function attachImapErrorHandler(imap: ImapErrorEmitter, onDisconnected: () => void): void {

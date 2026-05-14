@@ -6,6 +6,7 @@ import { getMemoryDb } from '@/lib/server/memory/memory-db'
 import { saveDreamCycle } from '@/lib/server/memory/dream-cycles'
 import { errorMessage } from '@/lib/shared-utils'
 import { log } from '@/lib/server/logger'
+import { resolveDreamGenerationPreference } from '@/lib/server/memory/dream-generation-preference'
 
 const TAG = 'dream-service'
 
@@ -214,7 +215,9 @@ ${memoryLines.join('\n')}`
 
   try {
     const { buildLLM } = await import('@/lib/server/build-llm')
-    const { llm } = await buildLLM({ agentId, responseFormat: 'json_object' })
+    const { loadSettings } = await import('@/lib/server/settings/settings-repository')
+    const preferred = resolveDreamGenerationPreference(loadSettings())
+    const { llm } = await buildLLM({ agentId, preferred, responseFormat: 'json_object' })
     const { HumanMessage } = await import('@langchain/core/messages')
 
     const response = await llm.invoke([new HumanMessage(prompt)])

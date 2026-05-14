@@ -4,6 +4,9 @@ import { resolveGenerationModelConfig } from '@/lib/server/build-llm'
 import { HumanMessage } from '@langchain/core/messages'
 import { errorMessage } from '@/lib/shared-utils'
 import { onNextIdleWindow } from '@/lib/server/runtime/idle-window'
+import { loadSettings } from '@/lib/server/settings/settings-repository'
+import { resolveDreamGenerationPreference } from '@/lib/server/memory/dream-generation-preference'
+import type { AppSettings } from '@/types'
 
 let consolidationRegistered = false
 let compactionRegistered = false
@@ -35,14 +38,18 @@ export function registerCompactionIdleCallback(): void {
   })
 }
 
-function canCreateDailyDigestForAgent(
+export function canCreateDailyDigestForAgent(
   agentId: string,
   agents: ReturnType<typeof loadAgents>,
+  settings: Partial<AppSettings> | Record<string, unknown> | null | undefined = loadSettings(),
 ): boolean {
   const agent = agents[agentId]
   if (!agent || agent.trashedAt) return false
   try {
-    resolveGenerationModelConfig({ agentId })
+    resolveGenerationModelConfig({
+      agentId,
+      preferred: resolveDreamGenerationPreference(settings),
+    })
     return true
   } catch (err: unknown) {
     const message = errorMessage(err)
@@ -65,6 +72,7 @@ export async function runDailyConsolidation(): Promise<{
   const memDb = getMemoryDb()
   const counts = memDb.countsByAgent()
   const agents = loadAgents({ includeTrashed: true })
+  const settings = loadSettings()
   const today = new Date().toISOString().slice(0, 10) // YYYY-MM-DD
   const digestTitle = `Daily digest: ${today}`
   const cutoff24h = Date.now() - 24 * 3600_000
@@ -76,7 +84,7 @@ export async function runDailyConsolidation(): Promise<{
     const agentId = agentKey
 
     try {
-      if (!canCreateDailyDigestForAgent(agentId, agents)) continue
+      if (!canCreateDailyDigestForAgent(agentId, agents, settings)) continue
 
       // Check if digest already exists for today
       const existing = memDb.search(digestTitle, agentId)
@@ -109,9 +117,12 @@ export async function runDailyConsolidation(): Promise<{
         ...memoryLines,
       ].join('\n')
 
-      // Use the target agent's configured generation provider
+      // Use an optional dream-model override before the target agent's generation provider.
       const { buildLLM } = await import('@/lib/server/build-llm')
-      const { llm } = await buildLLM({ agentId })
+      const { llm } = await buildLLM({
+        agentId,
+        preferred: resolveDreamGenerationPreference(settings),
+      })
 
       const response = await llm.invoke([new HumanMessage(prompt)])
       const digestContent = typeof response.content === 'string'

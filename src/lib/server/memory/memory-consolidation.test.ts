@@ -38,6 +38,7 @@ after(() => {
 })
 
 test('runDailyConsolidation skips orphaned and CLI-only agent namespaces without reporting errors', async () => {
+  storage.saveSettings({})
   const db = memDb.getMemoryDb()
   const now = Date.now()
   const orphanId = 'live-orphan-agent'
@@ -85,5 +86,41 @@ test('runDailyConsolidation skips orphaned and CLI-only agent namespaces without
   assert.equal(
     db.search(digestTitle, cliOnlyId).some((entry) => entry.category === 'daily_digest'),
     false,
+  )
+})
+
+test('canCreateDailyDigestForAgent allows CLI-only agents when a dream model is configured', async () => {
+  const now = Date.now()
+  const agentId = 'dream-routed-cli-agent'
+  storage.saveAgents({
+    [agentId]: {
+      id: agentId,
+      name: 'Dream Routed CLI Agent',
+      description: '',
+      systemPrompt: '',
+      provider: 'claude-cli',
+      model: 'claude-sonnet-4-5',
+      credentialId: null,
+      fallbackCredentialIds: [],
+      apiEndpoint: null,
+      createdAt: now,
+      updatedAt: now,
+    } as Agent,
+  })
+
+  storage.saveSettings({})
+  assert.equal(
+    consolidation.canCreateDailyDigestForAgent(agentId, storage.loadAgents({ includeTrashed: true }), storage.loadSettings()),
+    false,
+  )
+
+  storage.saveSettings({
+    dreamProvider: 'ollama',
+    dreamModel: 'llama3.2',
+    dreamEndpoint: 'http://127.0.0.1:11434',
+  })
+  assert.equal(
+    consolidation.canCreateDailyDigestForAgent(agentId, storage.loadAgents({ includeTrashed: true }), storage.loadSettings()),
+    true,
   )
 })

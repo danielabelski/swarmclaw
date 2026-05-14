@@ -47,11 +47,14 @@ function supportsStripTypes() {
 }
 
 function hasTsxRuntime() {
+  return Boolean(resolveTsxRuntimeImportPath())
+}
+
+function resolveTsxRuntimeImportPath() {
   try {
-    require.resolve('tsx/package.json')
-    return true
+    return require.resolve('tsx')
   } catch {
-    return false
+    return null
   }
 }
 
@@ -71,9 +74,10 @@ function buildLegacyTsCliArgs(cliPath, argv, options = {}) {
     return ['--no-warnings', '--experimental-strip-types', cliPath, ...argv]
   }
 
-  const tsxAvailable = options.hasTsxRuntime ?? hasTsxRuntime()
+  const tsxImportPath = options.tsxImportPath ?? resolveTsxRuntimeImportPath()
+  const tsxAvailable = options.hasTsxRuntime ?? Boolean(tsxImportPath)
   if (tsxAvailable) {
-    return ['--no-warnings', '--import', 'tsx', cliPath, ...argv]
+    return ['--no-warnings', '--import', tsxImportPath || 'tsx', cliPath, ...argv]
   }
 
   return null
@@ -374,6 +378,7 @@ module.exports = {
   normalizeLegacyTsCliArgv,
   pathIsInsideNodeModules,
   resolveLegacyTsCliPath,
+  resolveTsxRuntimeImportPath,
   TS_CLI_ACTIONS,
   normalizeLegacyCliEnv,
   printPackageVersion,
