@@ -24,6 +24,16 @@ function scoped(declared: string[] | null | undefined, universe: Set<string> = U
   return Array.from(new Set([...SCOPED_TOOL_BASELINE, ...picks]))
 }
 
+function scopedWithAttachedExtensions(
+  declared: string[] | null | undefined,
+  extraExtensions: string[] | null | undefined,
+  universe: Set<string> = UNIVERSAL_SAMPLE,
+): string[] {
+  const picks = normalize(declared).filter((t) => universe.has(t))
+  const attachedExternalExtensions = normalize(extraExtensions).filter((entry) => /\.(?:m?js)$/i.test(entry))
+  return Array.from(new Set([...SCOPED_TOOL_BASELINE, ...picks, ...attachedExternalExtensions]))
+}
+
 describe('scoped tool access algorithm', () => {
   it('intersects declared tools with the universe and keeps the baseline', () => {
     const out = scoped(['shell', 'files', 'edit_file', 'web'])
@@ -67,5 +77,11 @@ describe('scoped tool access algorithm', () => {
     const out = scoped(['  shell  ', '\tfiles\n'])
     assert.ok(out.includes('shell'))
     assert.ok(out.includes('files'))
+  })
+
+  it('keeps explicitly attached external extensions in scoped mode', () => {
+    const out = scopedWithAttachedExtensions(['shell'], ['freedzhost-critic.js'])
+    assert.ok(out.includes('shell'))
+    assert.ok(out.includes('freedzhost-critic.js'))
   })
 })

@@ -7,7 +7,7 @@ import { AVAILABLE_TOOLS, PLATFORM_TOOLS } from '@/lib/tool-definitions'
 import type { ToolDefinition } from '@/lib/tool-definitions'
 import type { Session } from '@/types'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip'
-import { getEnabledToolIds, getEnabledExtensionIds } from '@/lib/capability-selection'
+import { getEnabledToolIds, getEnabledExtensionIds, isExternalExtensionId } from '@/lib/capability-selection'
 
 interface Props {
   session: Session
@@ -15,6 +15,7 @@ interface Props {
 
 interface ExtensionToolInfo {
   extensionId: string
+  extensionName?: string
   toolName: string
   label: string
   description: string
@@ -55,7 +56,20 @@ export function ChatToolToggles({ session }: Props) {
     return () => document.removeEventListener('mousedown', handler)
   }, [open])
 
-  const toggleTool = async (toolId: string) => {
+  const toggleTool = async (tool: ToolDefinition) => {
+    if (tool.extensionId && isExternalExtensionId(tool.extensionId)) {
+      const updatedExtensions = sessionExtensions.includes(tool.extensionId)
+        ? sessionExtensions.filter((extensionId) => extensionId !== tool.extensionId)
+        : [...sessionExtensions, tool.extensionId]
+      await api('PUT', `/chats/${session.id}`, {
+        tools: sessionTools,
+        extensions: updatedExtensions,
+      })
+      await refreshSession(session.id)
+      return
+    }
+
+    const toolId = tool.id
     const updated = sessionTools.includes(toolId)
       ? sessionTools.filter((t) => t !== toolId)
       : [...sessionTools, toolId]
@@ -78,9 +92,9 @@ export function ChatToolToggles({ session }: Props) {
 
   // Convert external extension tools into ToolDefinition-like items for display
   const extensionToolDefs: ToolDefinition[] = externalTools.map((et) => ({
-    id: et.toolName,
+    id: `${et.extensionId}:${et.toolName}`,
     label: et.label,
-    description: et.description,
+    description: et.extensionName ? `${et.description || 'External extension tool'} (${et.extensionName})` : et.description,
     extensionId: et.extensionId,
   }))
 
@@ -92,7 +106,11 @@ export function ChatToolToggles({ session }: Props) {
 
   const allVisibleTools = groups.flatMap((g) => g.tools)
   const totalCount = allVisibleTools.length
-  const enabledCount = sessionTools.filter((id) => allVisibleTools.some((t) => t.id === id)).length
+  const enabledCount = allVisibleTools.filter((tool) => (
+    tool.extensionId && isExternalExtensionId(tool.extensionId)
+      ? sessionExtensions.includes(tool.extensionId)
+      : sessionTools.includes(tool.id)
+  )).length
 
   return (
     <div className="relative" ref={ref}>
@@ -120,13 +138,17 @@ export function ChatToolToggles({ session }: Props) {
                 <p className="text-[10px] font-600 text-text-3/60 uppercase tracking-wider mb-2">{group.label}</p>
                 {group.tools.map((tool) => {
                   const extDisabled = !isExtensionEnabled(tool)
-                  const enabled = !extDisabled && sessionTools.includes(tool.id)
+                  const enabled = !extDisabled && (
+                    tool.extensionId && isExternalExtensionId(tool.extensionId)
+                      ? sessionExtensions.includes(tool.extensionId)
+                      : sessionTools.includes(tool.id)
+                  )
                   return (
                     <Tooltip key={tool.id}>
                       <TooltipTrigger asChild>
                         <label className={`flex items-center gap-2.5 py-1.5 ${extDisabled ? 'cursor-not-allowed opacity-40' : 'cursor-pointer'}`}>
                           <div
-                            onClick={() => !extDisabled && toggleTool(tool.id)}
+                            onClick={() => !extDisabled && toggleTool(tool)}
                             className={`w-8 h-[18px] rounded-full transition-all duration-200 relative shrink-0
                               ${extDisabled ? 'bg-white/[0.04] cursor-not-allowed' : enabled ? 'bg-accent-bright cursor-pointer' : 'bg-white/[0.12] cursor-pointer'}`}
                           >

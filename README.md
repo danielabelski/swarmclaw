@@ -151,6 +151,15 @@ openclaw skills install swarmclaw
 
 [Browse on ClawHub](https://clawhub.ai/waydelyle/swarmclaw)
 
+## v1.9.34 Highlights
+
+Credential recovery and external extension access release for npm-global upgrades and scoped agent tool configuration.
+
+- **Credential secret recovery.** Startup now checks prior npm-global build env files before accepting a fresh per-version `CREDENTIAL_SECRET`, and validates candidate secrets against existing encrypted credentials before persisting `DATA_DIR/credential-secret`.
+- **Clear connector failures.** Connector startup now logs and surfaces credential decrypt failures directly instead of falling through to a misleading "No bot token configured" error.
+- **External extension tools.** Scoped agents now keep explicitly attached external `*.js` and `*.mjs` extensions, and the agent/chat tool controls persist enabled external tools through the `extensions` field.
+- **Regression coverage.** Added tests for previous-build credential recovery, non-decrypting secret replacement, scoped external extension access, and extension access persistence.
+
 ## v1.9.33 Highlights
 
 Issue and PR validation release for credential durability, delegated task dispatch, connector output hygiene, and OpenClaw gateway protocol compatibility.
@@ -444,6 +453,15 @@ If you need a trace-specific endpoint, set `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` 
 Operational docs: https://swarmclaw.ai/docs/observability
 
 ## Releases
+
+### v1.9.34 Highlights
+
+Credential recovery and external extension access release for npm-global upgrades and scoped agent tool configuration.
+
+- **Credential secret recovery.** Startup now checks prior npm-global build env files before accepting a fresh per-version `CREDENTIAL_SECRET`, and validates candidate secrets against existing encrypted credentials before persisting `DATA_DIR/credential-secret`.
+- **Clear connector failures.** Connector startup now logs and surfaces credential decrypt failures directly instead of falling through to a misleading "No bot token configured" error.
+- **External extension tools.** Scoped agents now keep explicitly attached external `*.js` and `*.mjs` extensions, and the agent/chat tool controls persist enabled external tools through the `extensions` field.
+- **Regression coverage.** Added tests for previous-build credential recovery, non-decrypting secret replacement, scoped external extension access, and extension access persistence.
 
 ### v1.9.33 Highlights
 

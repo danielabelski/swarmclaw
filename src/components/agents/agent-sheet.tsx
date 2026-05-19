@@ -57,6 +57,14 @@ const AUTO_SYNC_MODEL_PROVIDER_IDS = new Set<ProviderType>([
 const CONNECTION_TEST_TIMEOUT_MS = 40_000
 type AgentProviderId = string
 
+interface ExtensionToolInfo {
+  extensionId: string
+  extensionName?: string
+  toolName: string
+  label: string
+  description: string
+}
+
 function SectionCard({
   title,
   description,
@@ -223,6 +231,7 @@ export function AgentSheet() {
   const [toolAccessMode, setToolAccessMode] = useState<'universal' | 'scoped'>('scoped')
   const [extensions, setExtensions] = useState<string[]>([])
   const [enabledExtensionIds, setEnabledExtensionIds] = useState<Set<string> | null>(null)
+  const [externalTools, setExternalTools] = useState<ExtensionToolInfo[]>([])
   const [skills, setSkills] = useState<string[]>([])
   const [skillIds, setSkillIds] = useState<string[]>([])
   const [mcpServerIds, setMcpServerIds] = useState<string[]>([])
@@ -423,8 +432,11 @@ export function AgentSheet() {
       loadProjects()
       loadClaudeSkills()
       // Fetch enabled extension IDs so we can filter tool toggles
-      api<{ enabledExtensionIds: string[] }>('GET', '/extensions/builtins')
-        .then((res) => { if (res?.enabledExtensionIds) setEnabledExtensionIds(new Set(res.enabledExtensionIds)) })
+      api<{ enabledExtensionIds: string[]; externalTools?: ExtensionToolInfo[] }>('GET', '/extensions/builtins')
+        .then((res) => {
+          if (res?.enabledExtensionIds) setEnabledExtensionIds(new Set(res.enabledExtensionIds))
+          if (Array.isArray(res?.externalTools)) setExternalTools(res.externalTools)
+        })
         .catch(() => {})
       setTestStatus('idle')
       setTestMessage('')
@@ -2638,6 +2650,33 @@ export function AgentSheet() {
                   </label>
                 )
               })}
+          </div>
+        </div>
+      )}
+
+      {!hasNativeCapabilities && externalTools.length > 0 && (
+        <div className="mb-8">
+          <label className="block font-display text-[12px] font-600 text-text-2 uppercase tracking-[0.08em] mb-2">Extension Tools</label>
+          <p className="text-[12px] text-text-3/60 mb-3">Attach enabled external extension tools to this agent.</p>
+          <div className="space-y-3">
+            {externalTools.map((t) => {
+              const attached = extensions.includes(t.extensionId)
+              const description = t.extensionName
+                ? `${t.description || 'External extension tool'} (${t.extensionName})`
+                : (t.description || 'External extension tool')
+              return (
+                <label key={`${t.extensionId}:${t.toolName}`} className="flex items-center gap-3 cursor-pointer">
+                  <div
+                    onClick={() => setExtensions((prev) => prev.includes(t.extensionId) ? prev.filter((x) => x !== t.extensionId) : [...prev, t.extensionId])}
+                    className={`w-11 h-6 rounded-full transition-all duration-200 relative shrink-0 ${attached ? 'bg-accent-bright cursor-pointer' : 'bg-white/[0.08] cursor-pointer'}`}
+                  >
+                    <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all duration-200 ${attached ? 'left-[22px]' : 'left-0.5'}`} />
+                  </div>
+                  <span className="font-display text-[14px] font-600 text-text-2">{t.label}</span>
+                  <span className="text-[12px] text-text-3">{description}</span>
+                </label>
+              )
+            })}
           </div>
         </div>
       )}

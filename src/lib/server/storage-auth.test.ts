@@ -3,7 +3,9 @@ import { describe, it, beforeEach, afterEach } from 'node:test'
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
+import crypto from 'node:crypto'
 import { spawnSync } from 'node:child_process'
+import Database from 'better-sqlite3'
 
 const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../..')
 
@@ -12,13 +14,26 @@ function runStorageAuthImport(options: {
   generatedEnv?: string
   credentialSecretFile?: string
   externalCredentialSecret?: string
+  swarmclawHome?: boolean
+  buildEnvFiles?: Array<{ relativePath: string; content: string }>
+  encryptedCredentialSecrets?: string[]
 }) {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'storage-auth-import-'))
-  const dataDir = path.join(tmpDir, 'data')
-  const cwd = path.join(tmpDir, 'cwd')
+  const homeDir = path.join(tmpDir, 'home')
+  const dataDir = options.swarmclawHome ? path.join(homeDir, 'data') : path.join(tmpDir, 'data')
+  const cwd = options.swarmclawHome
+    ? path.join(homeDir, 'builds', 'package-current', '.next', 'standalone')
+    : path.join(tmpDir, 'cwd')
   fs.mkdirSync(dataDir, { recursive: true })
   fs.mkdirSync(cwd, { recursive: true })
   try {
+    for (const [index, entry] of (options.buildEnvFiles ?? []).entries()) {
+      const target = path.join(homeDir, entry.relativePath)
+      fs.mkdirSync(path.dirname(target), { recursive: true })
+      fs.writeFileSync(target, entry.content, 'utf8')
+      const time = new Date(Date.now() - (options.buildEnvFiles!.length - index) * 1000)
+      fs.utimesSync(target, time, time)
+    }
     if (options.envLocal !== undefined) {
       fs.writeFileSync(path.join(cwd, '.env.local'), options.envLocal, 'utf8')
     }
@@ -28,12 +43,32 @@ function runStorageAuthImport(options: {
     if (options.credentialSecretFile !== undefined) {
       fs.writeFileSync(path.join(dataDir, 'credential-secret'), options.credentialSecretFile, { encoding: 'utf8', mode: 0o600 })
     }
+    if (options.encryptedCredentialSecrets?.length) {
+      const db = new Database(path.join(dataDir, 'swarmclaw.db'))
+      try {
+        db.exec('CREATE TABLE IF NOT EXISTS credentials (id TEXT PRIMARY KEY, data TEXT NOT NULL)')
+        for (const [index, secret] of options.encryptedCredentialSecrets.entries()) {
+          const id = `cred_${index}`
+          const encryptedKey = encryptForSecret(secret, `token-${index}`)
+          db.prepare('INSERT OR REPLACE INTO credentials (id, data) VALUES (?, ?)').run(id, JSON.stringify({
+            id,
+            provider: 'slack',
+            name: `Credential ${index}`,
+            encryptedKey,
+            createdAt: Date.now(),
+          }))
+        }
+      } finally {
+        db.close()
+      }
+    }
     const env: NodeJS.ProcessEnv = {
       ...process.env,
       DATA_DIR: dataDir,
       WORKSPACE_DIR: path.join(tmpDir, 'workspace'),
       SWARMCLAW_DAEMON_AUTOSTART: '0',
     }
+    if (options.swarmclawHome) env.SWARMCLAW_HOME = homeDir
     delete env.ACCESS_KEY
     delete env.CREDENTIAL_SECRET
     delete env.SWARMCLAW_BUILD_MODE
@@ -67,6 +102,16 @@ function runStorageAuthImport(options: {
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true })
   }
+}
+
+function encryptForSecret(secret: string, plaintext: string): string {
+  const key = Buffer.from(secret, 'hex')
+  const iv = crypto.randomBytes(12)
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv)
+  let encrypted = cipher.update(plaintext, 'utf8', 'hex')
+  encrypted += cipher.final('hex')
+  const tag = cipher.getAuthTag().toString('hex')
+  return `${iv.toString('hex')}:${tag}:${encrypted}`
 }
 
 /**
@@ -248,5 +293,62 @@ describe('credential secret persistence precedence', () => {
 
     assert.equal(output.credentialSecret, externalSecret)
     assert.equal(output.fileSecret, fileSecret)
+  })
+
+  it('recovers the previous npm-global build credential secret before persisting a fresh current cwd secret', () => {
+    const previousSecret = 'd'.repeat(64)
+    const freshCurrentSecret = 'e'.repeat(64)
+    const output = runStorageAuthImport({
+      swarmclawHome: true,
+      envLocal: `CREDENTIAL_SECRET=${freshCurrentSecret}\n`,
+      encryptedCredentialSecrets: [previousSecret],
+      buildEnvFiles: [
+        {
+          relativePath: 'builds/package-1.9.32/.next/standalone/.env.local',
+          content: `CREDENTIAL_SECRET=${previousSecret}\n`,
+        },
+      ],
+    })
+
+    assert.equal(output.credentialSecret, previousSecret)
+    assert.equal(output.fileSecret, previousSecret)
+  })
+
+  it('replaces a non-decrypting DATA_DIR credential secret when a previous build secret decrypts existing credentials', () => {
+    const previousSecret = 'f'.repeat(64)
+    const wrongFileSecret = '1'.repeat(64)
+    const output = runStorageAuthImport({
+      swarmclawHome: true,
+      credentialSecretFile: wrongFileSecret,
+      encryptedCredentialSecrets: [previousSecret],
+      buildEnvFiles: [
+        {
+          relativePath: 'builds/package-1.9.31/.next/standalone/.env.local.bak',
+          content: `CREDENTIAL_SECRET=${previousSecret}\n`,
+        },
+      ],
+    })
+
+    assert.equal(output.credentialSecret, previousSecret)
+    assert.equal(output.fileSecret, previousSecret)
+  })
+
+  it('keeps a DATA_DIR credential secret when it can decrypt existing credentials', () => {
+    const workingFileSecret = '2'.repeat(64)
+    const previousSecret = '3'.repeat(64)
+    const output = runStorageAuthImport({
+      swarmclawHome: true,
+      credentialSecretFile: workingFileSecret,
+      encryptedCredentialSecrets: [workingFileSecret],
+      buildEnvFiles: [
+        {
+          relativePath: 'builds/package-1.9.31/.next/standalone/.env.local',
+          content: `CREDENTIAL_SECRET=${previousSecret}\n`,
+        },
+      ],
+    })
+
+    assert.equal(output.credentialSecret, workingFileSecret)
+    assert.equal(output.fileSecret, workingFileSecret)
   })
 })

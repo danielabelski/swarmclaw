@@ -20,7 +20,7 @@ export async function GET() {
 
   // For external extensions that are enabled, also collect their concrete tool names
   // so the UI can show those tools in the toggles
-  const externalTools: Array<{ extensionId: string; toolName: string; label: string; description: string }> = []
+  const externalTools: Array<{ extensionId: string; extensionName: string; toolName: string; label: string; description: string }> = []
   for (const meta of all) {
     if (meta.isBuiltin || !meta.enabled) continue
     try {
@@ -28,6 +28,7 @@ export async function GET() {
       for (const entry of tools) {
         externalTools.push({
           extensionId: entry.extensionId,
+          extensionName: meta.name || meta.filename,
           toolName: entry.tool.name,
           label: entry.tool.name.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
           description: entry.tool.description || '',

@@ -164,11 +164,23 @@ async function _startConnectorImpl(connectorId: string): Promise<void> {
 
     // Resolve bot token from credential
     let botToken = ''
+    let credentialDecryptError: string | null = null
     if (connector.credentialId) {
       const creds = loadCredentials()
       const cred = creds[connector.credentialId]
       if (cred?.encryptedKey) {
-        try { botToken = decryptKey(cred.encryptedKey) } catch { /* ignore */ }
+        try {
+          botToken = decryptKey(cred.encryptedKey)
+        } catch (err: unknown) {
+          credentialDecryptError = `Failed to decrypt credential "${connector.credentialId}". CREDENTIAL_SECRET may have changed since this credential was stored; restore the previous credential secret or re-add the key.`
+          log.warn(TAG, credentialDecryptError, {
+            connectorId,
+            connectorName: connector.name,
+            platform: connector.platform,
+            credentialId: connector.credentialId,
+            error: errorMessage(err),
+          })
+        }
       }
     }
     // Also check config for inline token (some platforms)
@@ -180,6 +192,10 @@ async function _startConnectorImpl(connectorId: string): Promise<void> {
     }
     if (!botToken && swarmdockFallbackPrivateKey) {
       botToken = swarmdockFallbackPrivateKey
+    }
+
+    if (!botToken && credentialDecryptError) {
+      throw new Error(credentialDecryptError)
     }
 
     if (!botToken && connector.platform !== 'whatsapp' && connector.platform !== 'openclaw' && connector.platform !== 'signal' && connector.platform !== 'email' && connector.platform !== 'filequeue' && connector.platform !== 'swarmdock') {

@@ -85,6 +85,55 @@ describe('discovery tool access flows', () => {
     assert.equal(output.extensions.includes('shell'), false)
   })
 
+  it('request_tool_access grants external extensions into the session extensions field', () => {
+    const output = runWithTempDataDir(`
+      const storageMod = await import('./src/lib/server/storage')
+      const toolsMod = await import('./src/lib/server/session-tools/index')
+      const storage = storageMod.default || storageMod
+      const toolsApi = toolsMod.default || toolsMod
+
+      const now = Date.now()
+      storage.saveSessions({
+        session_external_extension: {
+          id: 'session_external_extension',
+          name: 'External Extension Access Test',
+          cwd: process.env.WORKSPACE_DIR,
+          user: 'tester',
+          provider: 'openai',
+          model: 'gpt-test',
+          claudeSessionId: null,
+          messages: [],
+          createdAt: now,
+          lastActiveAt: now,
+          sessionType: 'human',
+          agentId: 'default',
+          tools: [],
+          extensions: [],
+        },
+      })
+
+      const built = await toolsApi.buildSessionTools(process.env.WORKSPACE_DIR, [], {
+        sessionId: 'session_external_extension',
+        agentId: 'default',
+        delegationEnabled: false,
+        delegationTargetMode: 'all',
+        delegationTargetAgentIds: [],
+      })
+      const tool = built.tools.find((entry) => entry.name === 'request_tool_access')
+      const raw = await tool.invoke({ toolId: 'freedzhost-critic.js', reason: 'Need the installed critic extension.' })
+      const session = storage.loadSessions().session_external_extension
+      console.log(JSON.stringify({
+        raw,
+        tools: session.tools || [],
+        extensions: session.extensions || [],
+      }))
+    `)
+
+    assert.match(String(output.raw), /tool_access_granted|granted immediately/i)
+    assert.equal(output.tools.includes('freedzhost-critic.js'), false)
+    assert.equal(output.extensions.includes('freedzhost-critic.js'), true)
+  })
+
   it('manage_capabilities request_access grants tools immediately without approval state', () => {
     const output = runWithTempDataDir(`
       const storageMod = await import('./src/lib/server/storage')

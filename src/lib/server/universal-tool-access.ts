@@ -1,4 +1,5 @@
 import { dedup } from '@/lib/shared-utils'
+import { isExternalExtensionId } from '@/lib/capability-selection'
 import { getExtensionManager } from './extensions'
 
 const UNIVERSAL_CORE_EXTENSION_IDS = [
@@ -78,5 +79,6 @@ export function listScopedToolAccessExtensionIds(
   const universe = new Set(listUniversalToolAccessExtensionIds(extraExtensions))
   const declared = normalizeExtensionList(declaredTools)
   const scoped = declared.filter((tool) => universe.has(tool))
-  return dedup([...SCOPED_TOOL_BASELINE, ...scoped])
+  const explicitlyAttachedExternalExtensions = normalizeExtensionList(extraExtensions).filter(isExternalExtensionId)
+  return dedup([...SCOPED_TOOL_BASELINE, ...scoped, ...explicitlyAttachedExternalExtensions])
 }

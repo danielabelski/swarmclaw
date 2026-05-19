@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import crypto from 'crypto'
+import Database from 'better-sqlite3'
 
 import { DATA_DIR, IS_BUILD_BOOTSTRAP } from './data-dir'
 import { log } from '@/lib/server/logger'
@@ -20,6 +21,11 @@ const CREDENTIAL_SECRET_FILE = path.join(DATA_DIR, 'credential-secret')
 
 // --- .env loading ---
 type LoadedEnvFile = Record<string, string>
+type CredentialSecretCandidate = {
+  secret: string
+  source: string
+  mtimeMs: number
+}
 
 function loadEnvFile(filePath: string): LoadedEnvFile {
   const loaded: LoadedEnvFile = {}
@@ -29,6 +35,10 @@ function loadEnvFile(filePath: string): LoadedEnvFile {
     if (k && v.length) loaded[k.trim()] = v.join('=').trim()
   })
   return loaded
+}
+
+function cleanSecret(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : ''
 }
 
 function applyLoadedEnv(loaded: LoadedEnvFile, externalKeys: Set<string>, options?: { overwriteLoaded?: boolean }) {
@@ -52,6 +62,161 @@ function loadEnv(): { generated: LoadedEnvFile; local: LoadedEnvFile } {
   applyLoadedEnv(generated, externalKeys)
   applyLoadedEnv(local, externalKeys, { overwriteLoaded: true })
   return { generated, local }
+}
+
+function appendCandidate(candidates: CredentialSecretCandidate[], seen: Set<string>, candidate: CredentialSecretCandidate): void {
+  const secret = cleanSecret(candidate.secret)
+  if (!secret || seen.has(secret)) return
+  seen.add(secret)
+  candidates.push({ ...candidate, secret })
+}
+
+function readEnvCandidate(filePath: string, source: string): CredentialSecretCandidate | null {
+  try {
+    if (!fs.existsSync(filePath)) return null
+    const secret = cleanSecret(loadEnvFile(filePath).CREDENTIAL_SECRET)
+    if (!secret) return null
+    return {
+      secret,
+      source,
+      mtimeMs: fs.statSync(filePath).mtimeMs,
+    }
+  } catch (err) {
+    log.debug(TAG, `Could not inspect legacy CREDENTIAL_SECRET candidate at ${filePath}`, {
+      error: err instanceof Error ? err.message : String(err),
+    })
+    return null
+  }
+}
+
+function findStateHomeCandidates(): string[] {
+  const homes: string[] = []
+  const configuredHome = cleanSecret(process.env.SWARMCLAW_HOME)
+  if (configuredHome) homes.push(path.resolve(configuredHome))
+  if (path.basename(DATA_DIR) === 'data') homes.push(path.dirname(DATA_DIR))
+  return Array.from(new Set(homes))
+}
+
+function collectPreviousBuildSecretCandidates(seen: Set<string>): CredentialSecretCandidate[] {
+  const candidates: CredentialSecretCandidate[] = []
+  for (const home of findStateHomeCandidates()) {
+    const buildsDir = path.join(home, 'builds')
+    let entries: fs.Dirent[]
+    try {
+      entries = fs.readdirSync(buildsDir, { withFileTypes: true })
+    } catch {
+      continue
+    }
+
+    for (const entry of entries) {
+      if (!entry.isDirectory() || !entry.name.startsWith('package-')) continue
+      const buildRoot = path.join(buildsDir, entry.name)
+      const envPaths = [
+        path.join(buildRoot, '.env.local'),
+        path.join(buildRoot, '.env.local.bak'),
+        path.join(buildRoot, '.next', 'standalone', '.env.local'),
+        path.join(buildRoot, '.next', 'standalone', '.env.local.bak'),
+      ]
+      for (const envPath of envPaths) {
+        const candidate = readEnvCandidate(envPath, `previous build env ${envPath}`)
+        if (candidate) appendCandidate(candidates, seen, candidate)
+      }
+    }
+  }
+
+  return candidates.sort((a, b) => b.mtimeMs - a.mtimeMs)
+}
+
+function readEncryptedCredentialKeysFromObject(value: unknown): string[] {
+  if (!value || typeof value !== 'object') return []
+  return Object.values(value as Record<string, unknown>)
+    .map((entry) => {
+      if (!entry || typeof entry !== 'object') return ''
+      return cleanSecret((entry as Record<string, unknown>).encryptedKey)
+    })
+    .filter(Boolean)
+}
+
+function readEncryptedCredentialKeys(): string[] {
+  const keys: string[] = []
+  const jsonPath = path.join(DATA_DIR, 'credentials.json')
+  try {
+    if (fs.existsSync(jsonPath)) {
+      keys.push(...readEncryptedCredentialKeysFromObject(JSON.parse(fs.readFileSync(jsonPath, 'utf8'))))
+    }
+  } catch (err) {
+    log.debug(TAG, `Could not inspect encrypted credentials in ${jsonPath}`, {
+      error: err instanceof Error ? err.message : String(err),
+    })
+  }
+
+  const dbPath = path.join(DATA_DIR, 'swarmclaw.db')
+  try {
+    if (fs.existsSync(dbPath)) {
+      const db = new Database(dbPath, { readonly: true, fileMustExist: true })
+      try {
+        const table = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'credentials'").get()
+        if (table) {
+          const rows = db.prepare('SELECT data FROM credentials LIMIT 500').all() as Array<{ data: string }>
+          const fromDb: Record<string, unknown> = {}
+          for (const [index, row] of rows.entries()) {
+            try {
+              fromDb[`row_${index}`] = JSON.parse(row.data)
+            } catch {
+              // Ignore malformed rows; storage normalization handles them later.
+            }
+          }
+          keys.push(...readEncryptedCredentialKeysFromObject(fromDb))
+        }
+      } finally {
+        db.close()
+      }
+    }
+  } catch (err) {
+    log.debug(TAG, `Could not inspect encrypted credentials in ${dbPath}`, {
+      error: err instanceof Error ? err.message : String(err),
+    })
+  }
+
+  return Array.from(new Set(keys))
+}
+
+function canDecryptCredential(encryptedKey: string, secret: string): boolean {
+  try {
+    const parts = encryptedKey.split(':')
+    if (parts.length !== 3) return false
+    const [ivHex, tagHex, encrypted] = parts
+    const key = Buffer.from(secret, 'hex')
+    if (key.length !== 32) return false
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivHex, 'hex'))
+    decipher.setAuthTag(Buffer.from(tagHex, 'hex'))
+    decipher.update(encrypted, 'hex', 'utf8')
+    decipher.final('utf8')
+    return true
+  } catch {
+    return false
+  }
+}
+
+function countDecryptableCredentials(secret: string, encryptedKeys: string[]): number {
+  if (encryptedKeys.length === 0) return 0
+  return encryptedKeys.filter((encryptedKey) => canDecryptCredential(encryptedKey, secret)).length
+}
+
+function selectCredentialSecretCandidate(
+  candidates: CredentialSecretCandidate[],
+  encryptedKeys: string[],
+): CredentialSecretCandidate | null {
+  if (candidates.length === 0) return null
+  if (encryptedKeys.length === 0) return candidates[0]
+
+  let best: { candidate: CredentialSecretCandidate; count: number } | null = null
+  for (const candidate of candidates) {
+    const count = countDecryptableCredentials(candidate.secret, encryptedKeys)
+    if (count === 0) continue
+    if (!best || count > best.count) best = { candidate, count }
+  }
+  return best?.candidate ?? null
 }
 const externalCredentialSecret = process.env.CREDENTIAL_SECRET?.trim() || ''
 const loadedEnv: { generated: LoadedEnvFile; local: LoadedEnvFile } = !IS_BUILD_BOOTSTRAP
@@ -118,16 +283,31 @@ function writeCredentialSecretFile(secret: string): boolean {
 // Resolve CREDENTIAL_SECRET in this precedence order:
 //   1. process.env (already set externally, e.g. by orchestrator)
 //   2. DATA_DIR/credential-secret (the stable home — survives upgrades)
-//   3. .env files (legacy — values loaded into process.env by loadEnv() above)
+//   3. .env files (legacy current cwd plus prior npm-global build env files)
 //   4. Generate new secret + persist to DATA_DIR/credential-secret
 //
 // Step 2 is the key change: previously the secret only lived in a per-version
 // .env.local (cwd changes on npm-global upgrade), so each upgrade
-// silently regenerated it and orphaned every encrypted credential.
+// silently regenerated it and orphaned every encrypted credential. When
+// encrypted credentials already exist, validate candidate legacy secrets by
+// actually decrypting a stored credential before persisting the migration.
 if (!IS_BUILD_BOOTSTRAP) {
-  const legacyEnvSecret = loadedEnv.local.CREDENTIAL_SECRET?.trim()
-    || loadedEnv.generated.CREDENTIAL_SECRET?.trim()
-    || ''
+  const encryptedCredentialKeys = readEncryptedCredentialKeys()
+  const candidateSeen = new Set<string>()
+  const legacyCandidates: CredentialSecretCandidate[] = []
+  appendCandidate(legacyCandidates, candidateSeen, {
+    secret: cleanSecret(loadedEnv.local.CREDENTIAL_SECRET),
+    source: `${path.join(process.cwd(), '.env.local')}`,
+    mtimeMs: 0,
+  })
+  appendCandidate(legacyCandidates, candidateSeen, {
+    secret: cleanSecret(loadedEnv.generated.CREDENTIAL_SECRET),
+    source: GENERATED_ENV_PATH,
+    mtimeMs: 0,
+  })
+  legacyCandidates.push(...collectPreviousBuildSecretCandidates(candidateSeen))
+
+  const legacyEnvSecret = legacyCandidates[0]?.secret || ''
   const fileSecret = readCredentialSecretFile()
   if (externalCredentialSecret) {
     process.env.CREDENTIAL_SECRET = externalCredentialSecret
@@ -135,23 +315,48 @@ if (!IS_BUILD_BOOTSTRAP) {
       log.warn(TAG, `CREDENTIAL_SECRET is set by the environment and differs from ${CREDENTIAL_SECRET_FILE}; using the environment value.`)
     }
   } else if (fileSecret) {
-    process.env.CREDENTIAL_SECRET = fileSecret
-    if (legacyEnvSecret && legacyEnvSecret !== fileSecret) {
-      // Both persisted locations exist and disagree. Trust DATA_DIR because it
-      // survives npm-global upgrades and Docker restarts.
-      log.warn(TAG, `CREDENTIAL_SECRET mismatch between legacy env files and ${CREDENTIAL_SECRET_FILE}; using the file value.`)
-    }
-  } else if (legacyEnvSecret) {
-    process.env.CREDENTIAL_SECRET = legacyEnvSecret
-    if (writeCredentialSecretFile(legacyEnvSecret)) {
-      log.info(TAG, `Migrated CREDENTIAL_SECRET from .env to ${CREDENTIAL_SECRET_FILE}`)
+    const fileDecryptsCredentials = encryptedCredentialKeys.length === 0
+      || countDecryptableCredentials(fileSecret, encryptedCredentialKeys) > 0
+    if (!fileDecryptsCredentials) {
+      const recovered = selectCredentialSecretCandidate(
+        legacyCandidates.filter((candidate) => candidate.secret !== fileSecret),
+        encryptedCredentialKeys,
+      )
+      if (recovered) {
+        process.env.CREDENTIAL_SECRET = recovered.secret
+        writeCredentialSecretFile(recovered.secret)
+        log.warn(TAG, `Recovered CREDENTIAL_SECRET from ${recovered.source} because ${CREDENTIAL_SECRET_FILE} could not decrypt existing credentials.`)
+      } else {
+        process.env.CREDENTIAL_SECRET = fileSecret
+        log.warn(TAG, `${CREDENTIAL_SECRET_FILE} could not decrypt existing credentials, and no recoverable previous-build CREDENTIAL_SECRET was found.`)
+      }
+    } else {
+      process.env.CREDENTIAL_SECRET = fileSecret
+      if (legacyEnvSecret && legacyEnvSecret !== fileSecret) {
+        // Both persisted locations exist and disagree. Trust DATA_DIR because it
+        // survives npm-global upgrades and Docker restarts.
+        log.warn(TAG, `CREDENTIAL_SECRET mismatch between legacy env files and ${CREDENTIAL_SECRET_FILE}; using the file value.`)
+      }
     }
   } else {
-    // First-ever launch on this DATA_DIR. Generate.
-    const secret = crypto.randomBytes(32).toString('hex')
-    process.env.CREDENTIAL_SECRET = secret
-    writeCredentialSecretFile(secret)
-    log.info(TAG, `Generated CREDENTIAL_SECRET and persisted to ${CREDENTIAL_SECRET_FILE}`)
+    const recovered = selectCredentialSecretCandidate(legacyCandidates, encryptedCredentialKeys)
+    if (recovered) {
+      process.env.CREDENTIAL_SECRET = recovered.secret
+      if (writeCredentialSecretFile(recovered.secret)) {
+        log.info(TAG, `Migrated CREDENTIAL_SECRET from ${recovered.source} to ${CREDENTIAL_SECRET_FILE}`)
+      }
+    } else if (legacyEnvSecret) {
+      process.env.CREDENTIAL_SECRET = legacyEnvSecret
+      if (writeCredentialSecretFile(legacyEnvSecret)) {
+        log.info(TAG, `Migrated CREDENTIAL_SECRET from .env to ${CREDENTIAL_SECRET_FILE}`)
+      }
+    } else {
+      // First-ever launch on this DATA_DIR. Generate.
+      const secret = crypto.randomBytes(32).toString('hex')
+      process.env.CREDENTIAL_SECRET = secret
+      writeCredentialSecretFile(secret)
+      log.info(TAG, `Generated CREDENTIAL_SECRET and persisted to ${CREDENTIAL_SECRET_FILE}`)
+    }
   }
 }
 
