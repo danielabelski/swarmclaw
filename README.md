@@ -151,6 +151,14 @@ openclaw skills install swarmclaw
 
 [Browse on ClawHub](https://clawhub.ai/waydelyle/swarmclaw)
 
+## v1.9.35 Highlights
+
+Installed package build fix for fresh npm-global installs and upgrades.
+
+- **Fallback build dependency fix.** The npm package now declares `mime-types` and `@types/mime-types` directly so `swarmclaw server --build` can type-check the OpenClaw media proxy on clean installs.
+- **Installed-build regression guard.** CLI/package tests now verify that unbundled type declarations needed by local fallback builds ship as runtime package dependencies.
+- **macOS desktop status.** The damaged-app issue remains open until Developer ID signing and Apple notarization are configured and verified on downloaded macOS artifacts.
+
 ## v1.9.34 Highlights
 
 Credential recovery and external extension access release for npm-global upgrades and scoped agent tool configuration.
@@ -453,6 +461,14 @@ If you need a trace-specific endpoint, set `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` 
 Operational docs: https://swarmclaw.ai/docs/observability
 
 ## Releases
+
+### v1.9.35 Highlights
+
+Installed package build fix for fresh npm-global installs and upgrades.
+
+- **Fallback build dependency fix.** The npm package now declares `mime-types` and `@types/mime-types` directly so `swarmclaw server --build` can type-check the OpenClaw media proxy on clean installs.
+- **Installed-build regression guard.** CLI/package tests now verify that unbundled type declarations needed by local fallback builds ship as runtime package dependencies.
+- **macOS desktop status.** The damaged-app issue remains open until Developer ID signing and Apple notarization are configured and verified on downloaded macOS artifacts.
 
 ### v1.9.34 Highlights
 

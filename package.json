@@ -1,6 +1,6 @@
 {
   "name": "@swarmclawai/swarmclaw",
-  "version": "1.9.34",
+  "version": "1.9.35",
   "description": "Build and run autonomous AI agents with OpenClaw, Hermes, multiple model providers, orchestration, delegation, memory, skills, schedules, and chat connectors.",
   "main": "electron-dist/main.js",
   "license": "MIT",
@@ -121,6 +121,7 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/dagre": "^0.7.54",
     "@types/mailparser": "^3.4.6",
+    "@types/mime-types": "^2.1.4",
     "@types/node": "^20",
     "@types/nodemailer": "^7.0.11",
     "@types/qrcode": "^1.5.6",
@@ -151,6 +152,7 @@
     "langchain": "^1.2.30",
     "lucide-react": "^0.574.0",
     "mailparser": "^3.9.3",
+    "mime-types": "^3.0.2",
     "next": "16.2.4",
     "next-themes": "^0.4.6",
     "nodemailer": "^8.0.1",
