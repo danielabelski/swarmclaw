@@ -151,6 +151,15 @@ openclaw skills install swarmclaw
 
 [Browse on ClawHub](https://clawhub.ai/waydelyle/swarmclaw)
 
+## v1.9.37 Highlights
+
+Theme and memory-pressure release for lighter UI preferences and leaner chat history storage.
+
+- **Light, dark, and system theme modes.** Settings → Appearance now persists a Light/Dark/System selector while keeping the existing hue presets and custom color picker.
+- **Lean session history storage.** Legacy transcript blobs migrate into the `session_messages` table and are compacted from session records after persistence is verified, reducing page-load memory pressure on lower-RAM devices.
+- **Repo-backed message readers.** Global search, live usage summaries, and OpenClaw history merge now read table-backed messages after transcript compaction.
+- **Regression coverage.** Added tests for theme-mode normalization, legacy transcript compaction, and repo-backed message search.
+
 ## v1.9.36 Highlights
 
 Protocol builder visibility release for built-in Structured Sessions.
@@ -469,6 +478,15 @@ If you need a trace-specific endpoint, set `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` 
 Operational docs: https://swarmclaw.ai/docs/observability
 
 ## Releases
+
+### v1.9.37 Highlights
+
+Theme and memory-pressure release for lighter UI preferences and leaner chat history storage.
+
+- **Light, dark, and system theme modes.** Settings → Appearance now persists a Light/Dark/System selector while keeping the existing hue presets and custom color picker.
+- **Lean session history storage.** Legacy transcript blobs migrate into the `session_messages` table and are compacted from session records after persistence is verified, reducing page-load memory pressure on lower-RAM devices.
+- **Repo-backed message readers.** Global search, live usage summaries, and OpenClaw history merge now read table-backed messages after transcript compaction.
+- **Regression coverage.** Added tests for theme-mode normalization, legacy transcript compaction, and repo-backed message search.
 
 ### v1.9.36 Highlights
 
