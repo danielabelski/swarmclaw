@@ -500,6 +500,13 @@ Operational docs: https://swarmclaw.ai/docs/observability
 
 ## Releases
 
+### v1.9.40 Highlights
+
+Multi-architecture container images and a new provider.
+
+- **Multi-arch Docker images.** `ghcr.io/swarmclawai/swarmclaw` is now published for both `linux/amd64` and `linux/arm64`, so ARM64 servers (and Apple Silicon) can pull `:latest` or a pinned tag directly instead of building the image locally.
+- **Requesty provider.** Added [Requesty](https://requesty.ai) as a built-in OpenAI-compatible provider, with setup defaults and a key link, following the standard provider pattern.
+
 ### v1.9.39 Highlights
 
 Scheduled-run reliability release: stale workspace rebinding, fail-fast credential checks, and durable delivery evidence for schedule-driven sends.
